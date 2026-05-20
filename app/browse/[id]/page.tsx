@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import PageContainer from '../../../components/PageContainer';
-import { browseGigs } from '../../../lib/mockGigs';
+import { supabase } from '../../../lib/supabase';
+import type { BrowseGig } from '../../../lib/mockGigs';
 
 type Props = {
   params: {
@@ -9,12 +10,26 @@ type Props = {
   };
 };
 
-export function generateStaticParams() {
-  return browseGigs.map((gig) => ({ id: gig.id }));
-}
+export default async function BrowseGigPage({ params }: Props) {
+  const { data: gig, error } = await supabase
+    .from<BrowseGig>('gigs')
+    .select('id,title,category,budget,location,date_time,description,status')
+    .eq('id', params.id)
+    .maybeSingle();
 
-export default function BrowseGigPage({ params }: Props) {
-  const gig = browseGigs.find((item) => item.id === params.id);
+  if (error) {
+    console.error('Supabase gig fetch error:', error);
+    return (
+      <PageContainer>
+        <div className="rounded-[2rem] bg-white/90 p-8 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200">
+          <div className="text-center text-slate-700">
+            <p className="text-lg font-semibold">Keikkaa ei voitu ladata</p>
+            <p className="mt-2 text-sm">Tarkista verkkoyhteys ja yritä uudelleen.</p>
+          </div>
+        </div>
+      </PageContainer>
+    );
+  }
 
   if (!gig) {
     notFound();
@@ -42,7 +57,7 @@ export default function BrowseGigPage({ params }: Props) {
           </div>
           <div className="space-y-2 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4 text-right">
             <p className="text-sm text-slate-500">Hinta</p>
-            <p className="text-2xl font-semibold text-slate-900">{gig.price}</p>
+            <p className="text-2xl font-semibold text-slate-900">{gig.budget}</p>
           </div>
         </div>
 
@@ -53,7 +68,7 @@ export default function BrowseGigPage({ params }: Props) {
           </div>
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Aika</p>
-            <p className="text-sm font-semibold text-slate-900">{gig.date}</p>
+            <p className="text-sm font-semibold text-slate-900">{gig.date_time}</p>
           </div>
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Tila</p>

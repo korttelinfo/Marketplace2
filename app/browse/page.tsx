@@ -1,16 +1,53 @@
 ﻿'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PageContainer from '../../components/PageContainer';
 import GigCard from '../../components/GigCard';
-import { browseCategories, browseGigs } from '../../lib/mockGigs';
+import { browseCategories, type BrowseGig } from '../../lib/mockGigs';
+import { supabase } from '../../lib/supabase';
 
 export default function BrowsePage() {
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('Kaikki');
+  const [gigs, setGigs] = useState<BrowseGig[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchGigs = async () => {
+      setLoading(true);
+      setError(null);
+
+      const { data, error: fetchError } = await supabase
+        .from('gigs')
+        .select('id,title,category,budget,location,date_time,description,status');
+
+      if (fetchError) {
+        console.error('Supabase fetch error:', fetchError);
+        setError(fetchError.message);
+        setGigs([]);
+      } else {
+        setGigs(data ?? []);
+      }
+
+      setLoading(false);
+    };
+
+    fetchGigs();
+  }, []);
+
+  useEffect(() => {
+    if (!error) return;
+
+    const timer = setTimeout(() => {
+      setError(null);
+    }, 10000);
+
+    return () => clearTimeout(timer);
+  }, [error]);
 
   const filteredGigs = useMemo(() => {
-    return browseGigs.filter((gig) => {
+    return gigs.filter((gig) => {
       const matchesCategory = activeCategory === 'Kaikki' || gig.category === activeCategory;
       const matchesQuery = query
         ? [gig.title, gig.description, gig.category, gig.location].some((field) =>
@@ -19,7 +56,7 @@ export default function BrowsePage() {
         : true;
       return matchesCategory && matchesQuery;
     });
-  }, [activeCategory, query]);
+  }, [activeCategory, gigs, query]);
 
   return (
     <PageContainer>
@@ -45,7 +82,9 @@ export default function BrowsePage() {
               className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
             />
           </label>
-          <p className="text-sm text-slate-500 sm:text-right">{filteredGigs.length} keikkaa</p>
+          <p className="text-sm text-slate-500 sm:text-right">
+            {loading ? 'Ladataan...' : `${filteredGigs.length} keikkaa`}
+          </p>
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
@@ -68,11 +107,21 @@ export default function BrowsePage() {
           })}
         </div>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredGigs.map((gig) => (
-            <GigCard key={gig.title} gig={gig} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="mt-8 rounded-[2rem] border border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
+            Ladataan keikkoja...
+          </div>
+        ) : error ? (
+          <div className="mt-8 rounded-[2rem] border border-red-200 bg-red-50 p-6 text-center text-red-700">
+            {error}
+          </div>
+        ) : (
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {filteredGigs.map((gig) => (
+              <GigCard key={gig.id} gig={gig} />
+            ))}
+          </div>
+        )}
       </div>
     </PageContainer>
   );

@@ -1,16 +1,54 @@
 ﻿'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import PageContainer from '../../components/PageContainer';
 import { formCategories } from '../../lib/mockGigs';
+import { supabase } from '../../lib/supabase';
 
 export default function CreatePage() {
+  const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState(formCategories[0]);
   const [budget, setBudget] = useState('');
   const [location, setLocation] = useState('');
   const [dateTime, setDateTime] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [messageType, setMessageType] = useState<'success' | 'error' | null>(null);
+
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setMessage(null);
+    setMessageType(null);
+
+    const { error } = await supabase.from('gigs').insert({
+      title,
+      description,
+      category,
+      budget,
+      location,
+      date_time: dateTime,
+    });
+
+    if (error) {
+      console.error('Supabase insert error:', error);
+      setMessage('Tapahtui virhe keikan lisäämisessä. Yritä uudelleen.');
+      setMessageType('error');
+      setIsSubmitting(false);
+      return;
+    }
+
+    setMessage('Keikka lisätty! Ohjataan selaamaan keikkoja...');
+    setMessageType('success');
+
+    window.setTimeout(() => {
+      router.push('/browse');
+    }, 800);
+  };
 
   return (
     <PageContainer contentClassName="max-w-3xl">
@@ -102,11 +140,25 @@ export default function CreatePage() {
             </label>
           </div>
 
+          {message ? (
+            <div
+              className={`rounded-3xl border px-4 py-3 text-sm ${
+                messageType === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-rose-200 bg-rose-50 text-rose-700'
+              }`}
+            >
+              {message}
+            </div>
+          ) : null}
+
           <button
             type="button"
-            className="inline-flex w-full justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="inline-flex w-full justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
           >
-            Lähetä keikka
+            {isSubmitting ? 'Lähetetään...' : 'Lähetä keikka'}
           </button>
         </form>
       </div>

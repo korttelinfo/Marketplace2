@@ -2,9 +2,9 @@ export type BrowseGig = {
   id: string;
   title: string;
   category: string;
-  price: string;
+  budget: string;
   location: string;
-  date: string;
+  date_time: string;
   description: string;
   status: string;
 };
@@ -54,9 +54,9 @@ export const browseGigs: BrowseGig[] = [
     id: 'ikkunanpesu-kerrostalossa',
     title: 'Ikkunanpesu kerrostalossa',
     category: 'Kodin apu',
-    price: '18 €',
+    budget: '18 €',
     location: 'Kallio',
-    date: 'Huomenna',
+    date_time: 'Huomenna',
     description: 'Sisä- ja ulkopintojen kevyt pesu nopeasti.',
     status: 'Uusi',
   },
@@ -64,9 +64,9 @@ export const browseGigs: BrowseGig[] = [
     id: 'koiran-iltalenkki',
     title: 'Koiran iltalenkki',
     category: 'Lemmikit',
-    price: '15 €',
+    budget: '15 €',
     location: 'Helsinki',
-    date: 'Tänään',
+    date_time: 'Tänään',
     description: '30 minuutin lenkki ja pieni leikkihetki.',
     status: 'Vapaa',
   },
@@ -74,9 +74,9 @@ export const browseGigs: BrowseGig[] = [
     id: 'pihan-kitkenta',
     title: 'Pihan kitkentä',
     category: 'Piha & puutarha',
-    price: '22 €',
+    budget: '22 €',
     location: 'Lahti',
-    date: '2 pv',
+    date_time: '2 pv',
     description: 'Rikotaan rikkaruohot ja siistitään kukkapenkki.',
     status: 'Suosittu',
   },
@@ -84,9 +84,9 @@ export const browseGigs: BrowseGig[] = [
     id: 'kirjahyllyn-kokoaminen',
     title: 'Kirjahyllyn kasaus',
     category: 'Tekninen apu',
-    price: '25 €',
+    budget: '25 €',
     location: 'Helsinki',
-    date: '3 pv',
+    date_time: '3 pv',
     description: 'Ikean hylly paikalleen ja kiinnitys seinään.',
     status: 'Vapaa',
   },
@@ -94,9 +94,9 @@ export const browseGigs: BrowseGig[] = [
     id: 'paketin-nouto-ja-toimitus',
     title: 'Paketin nouto ja toimitus',
     category: 'Kodin apu',
-    price: '10 €',
+    budget: '10 €',
     location: 'Espoo',
-    date: 'Huomenna',
+    date_time: 'Huomenna',
     description: 'Nouda paketti lähikaupasta ja tuo kotiovelle.',
     status: 'Uusi',
   },
@@ -104,9 +104,9 @@ export const browseGigs: BrowseGig[] = [
     id: 'pieni-tietokoneapu',
     title: 'Pieni tietokoneapu',
     category: 'Tekninen apu',
-    price: '30 €',
+    budget: '30 €',
     location: 'Tapiola',
-    date: '4 pv',
+    date_time: '4 pv',
     description: 'Avaa asetukset, asenna ohjelma ja tarkista yhteys.',
     status: 'Suosittu',
   },
