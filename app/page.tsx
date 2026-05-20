@@ -98,7 +98,7 @@ export default function Home() {
               Luo keikka
             </a>
             <a
-              href="#gigs"
+              href="/browse"
               className="inline-flex justify-center rounded-full border border-white/20 bg-transparent px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
             >
               Tutustu keikkoihin
