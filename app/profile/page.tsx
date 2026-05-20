@@ -13,6 +13,10 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [profileLocation, setProfileLocation] = useState<string | null>(null);
+  const [memberSince, setMemberSince] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUserGigs = async () => {
@@ -24,6 +28,11 @@ export default function ProfilePage() {
       }
 
       const userId = sessionData.session.user.id;
+      const email = sessionData.session.user.email ?? null;
+      setUserEmail(email);
+
+      const createdAt = sessionData.session.user.created_at;
+      if (createdAt) setMemberSince(String(new Date(createdAt).getFullYear()));
       const { data, error } = await supabase
         .from<BrowseGig>('gigs')
         .select('id,title,category,budget,location,date_time,description,status')
@@ -35,6 +44,15 @@ export default function ProfilePage() {
         setError(error.message);
       } else {
         setGigs(data ?? []);
+      }
+
+      // Attempt to load an optional `profiles` table for richer user info
+      const { data: profileData } = await supabase.from('profiles').select('full_name,location').eq('id', userId).single();
+      if (profileData) {
+        setDisplayName(profileData.full_name ?? email);
+        setProfileLocation(profileData.location ?? null);
+      } else {
+        setDisplayName(email);
       }
 
       setLoading(false);
@@ -93,9 +111,9 @@ export default function ProfilePage() {
         <section className="space-y-6 rounded-[2rem] bg-white/90 p-6 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 sm:p-8">
           <div className="space-y-4">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Oma profiili</p>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Testikäyttäjä</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{displayName ?? userEmail ?? 'Profiili'}</h1>
             <p className="max-w-2xl text-sm leading-7 text-slate-600">
-              Helsinki · Jäsen vuodesta 2026
+              {profileLocation ?? 'Helsinki'} · Jäsen vuodesta {memberSince ?? '2026'}
             </p>
           </div>
 
@@ -126,15 +144,15 @@ export default function ProfilePage() {
           <div className="mt-6 grid gap-4">
             <div className="rounded-[1.75rem] bg-slate-50 p-5 text-sm text-slate-600">
               <p className="font-semibold text-slate-900">Nimi</p>
-              <p className="mt-2">Testikäyttäjä</p>
+              <p className="mt-2">{displayName ?? userEmail ?? 'Ei nimeä'}</p>
             </div>
             <div className="rounded-[1.75rem] bg-slate-50 p-5 text-sm text-slate-600">
               <p className="font-semibold text-slate-900">Sijainti</p>
-              <p className="mt-2">Helsinki</p>
+              <p className="mt-2">{profileLocation ?? 'Helsinki'}</p>
             </div>
             <div className="rounded-[1.75rem] bg-slate-50 p-5 text-sm text-slate-600">
               <p className="font-semibold text-slate-900">Jäsen vuodesta</p>
-              <p className="mt-2">2026</p>
+              <p className="mt-2">{memberSince ?? '2026'}</p>
             </div>
           </div>
         </section>

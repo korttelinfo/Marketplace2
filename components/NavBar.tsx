@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
@@ -30,9 +31,10 @@ export default function NavBar() {
       setSession(data.session);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, authSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!mounted) return;
-      setSession(authSession?.session ?? null);
+      // `newSession` is the Session object or null
+      setSession(newSession ?? null);
     });
 
     return () => {
@@ -44,7 +46,7 @@ export default function NavBar() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setSession(null);
-    router.push('/login');
+    router.push('/');
   };
 
   const isLoggedIn = Boolean(session?.user);
@@ -52,17 +54,17 @@ export default function NavBar() {
   return (
     <nav className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 backdrop-blur-md shadow-sm shadow-slate-100">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-6 lg:px-8">
-        <a href="/" className="text-lg font-semibold tracking-tight text-slate-900">
+        <Link href="/" className="text-lg font-semibold tracking-tight text-slate-900">
           Korttelinfo
-        </a>
+        </Link>
 
         <div className="flex flex-wrap items-center gap-2">
           {navLinks.map((link) => {
             const isActive = link.href === '/' ? pathname === '/' : pathname.startsWith(link.href);
             return (
-              <a key={link.href} href={link.href} className={navLinkClass(isActive)}>
+              <Link key={link.href} href={link.href} className={navLinkClass(isActive)}>
                 {link.label}
-              </a>
+              </Link>
             );
           })}
 
@@ -74,20 +76,20 @@ export default function NavBar() {
               Logout
             </button>
           ) : (
-            <a
+            <Link
               href="/login"
               className="rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
             >
               Login
-            </a>
+            </Link>
           )}
 
-          <a
+          <Link
             href="/create"
             className="rounded-full border border-slate-200 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
             Luo keikka
-          </a>
+          </Link>
         </div>
       </div>
     </nav>
