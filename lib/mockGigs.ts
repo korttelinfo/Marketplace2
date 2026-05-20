@@ -1,4 +1,5 @@
 export type BrowseGig = {
+  id: string;
   title: string;
   category: string;
   price: string;
@@ -50,6 +51,7 @@ export const landingGigs: LandingGig[] = [
 
 export const browseGigs: BrowseGig[] = [
   {
+    id: 'ikkunanpesu-kerrostalossa',
     title: 'Ikkunanpesu kerrostalossa',
     category: 'Kodin apu',
     price: '18 €',
@@ -59,6 +61,7 @@ export const browseGigs: BrowseGig[] = [
     status: 'Uusi',
   },
   {
+    id: 'koiran-iltalenkki',
     title: 'Koiran iltalenkki',
     category: 'Lemmikit',
     price: '15 €',
@@ -68,6 +71,7 @@ export const browseGigs: BrowseGig[] = [
     status: 'Vapaa',
   },
   {
+    id: 'pihan-kitkenta',
     title: 'Pihan kitkentä',
     category: 'Piha & puutarha',
     price: '22 €',
@@ -77,6 +81,7 @@ export const browseGigs: BrowseGig[] = [
     status: 'Suosittu',
   },
   {
+    id: 'kirjahyllyn-kokoaminen',
     title: 'Kirjahyllyn kasaus',
     category: 'Tekninen apu',
     price: '25 €',
@@ -86,6 +91,7 @@ export const browseGigs: BrowseGig[] = [
     status: 'Vapaa',
   },
   {
+    id: 'paketin-nouto-ja-toimitus',
     title: 'Paketin nouto ja toimitus',
     category: 'Kodin apu',
     price: '10 €',
@@ -95,6 +101,7 @@ export const browseGigs: BrowseGig[] = [
     status: 'Uusi',
   },
   {
+    id: 'pieni-tietokoneapu',
     title: 'Pieni tietokoneapu',
     category: 'Tekninen apu',
     price: '30 €',

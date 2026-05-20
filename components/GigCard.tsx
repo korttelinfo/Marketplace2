@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { BrowseGig } from '../lib/mockGigs';
 
 type GigCardProps = {
@@ -21,9 +22,12 @@ export default function GigCard({ gig }: GigCardProps) {
         <span className="text-slate-500">{gig.location}</span>
       </div>
       <div className="mt-6">
-        <button className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700">
+        <Link
+          href={`/browse/${gig.id}`}
+          className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+        >
           Katso keikka
-        </button>
+        </Link>
       </div>
     </article>
   );
