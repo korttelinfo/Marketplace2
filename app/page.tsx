@@ -1,4 +1,5 @@
-﻿import PageContainer from '../components/PageContainer';
+﻿import Link from 'next/link';
+import PageContainer from '../components/PageContainer';
 import { landingCategories, landingGigs } from '../lib/mockGigs';
 
 export default function Home() {
@@ -74,9 +75,12 @@ export default function Home() {
               <h3 className="text-xl font-semibold text-slate-900">{gig.title}</h3>
               <p className="mt-3 text-sm leading-6 text-slate-600">{gig.details}</p>
               <div className="mt-6">
-                <button className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700">
+                <Link
+                  href="/browse"
+                  className="inline-flex w-full items-center justify-center rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+                >
                   Katso keikka
-                </button>
+                </Link>
               </div>
             </article>
           ))}

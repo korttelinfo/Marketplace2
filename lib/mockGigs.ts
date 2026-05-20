@@ -7,6 +7,7 @@ export type BrowseGig = {
   date_time: string;
   description: string;
   status: string;
+  user_id?: string;
 };
 
 export type LandingCategory = {

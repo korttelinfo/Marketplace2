@@ -1,35 +1,82 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import PageContainer from '../../components/PageContainer';
 import GigCard from '../../components/GigCard';
 import { supabase } from '../../lib/supabase';
 import type { BrowseGig } from '../../lib/mockGigs';
 
-async function getGigs() {
-  const { data, error } = await supabase
-    .from<BrowseGig>('gigs')
-    .select('id,title,category,budget,location,date_time,description,status')
-    .order('date_time', { ascending: false });
+export default function ProfilePage() {
+  const router = useRouter();
+  const [gigs, setGigs] = useState<BrowseGig[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  if (error) {
-    throw error;
+  useEffect(() => {
+    const loadUserGigs = async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+
+      if (!sessionData.session) {
+        router.replace('/login');
+        return;
+      }
+
+      const userId = sessionData.session.user.id;
+      const { data, error } = await supabase
+        .from<BrowseGig>('gigs')
+        .select('id,title,category,budget,location,date_time,description,status')
+        .eq('user_id', userId)
+        .order('date_time', { ascending: false });
+
+      if (error) {
+        console.error('Supabase profile fetch error:', error);
+        setError(error.message);
+      } else {
+        setGigs(data ?? []);
+      }
+
+      setLoading(false);
+    };
+
+    loadUserGigs();
+  }, [router]);
+
+  const handleDelete = async (id: string) => {
+    const confirmed = window.confirm('Haluatko varmasti poistaa tämän keikan?');
+    if (!confirmed) return;
+
+    setDeletingId(id);
+    const { error } = await supabase.from('gigs').delete().eq('id', id);
+
+    if (error) {
+      console.error('Supabase delete error:', error);
+      setError('Keikan poistossa tapahtui virhe. Yritä uudelleen.');
+      setDeletingId(null);
+      return;
+    }
+
+    setGigs((current) => current.filter((gig) => gig.id !== id));
+    setDeletingId(null);
+  };
+
+  if (loading) {
+    return (
+      <PageContainer>
+        <div className="rounded-[2rem] bg-white/90 p-8 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 text-center text-slate-500">
+          Profiilia ladataan...
+        </div>
+      </PageContainer>
+    );
   }
 
-  return data ?? [];
-}
-
-export default async function ProfilePage() {
-  let gigs: BrowseGig[] = [];
-
-  try {
-    gigs = await getGigs();
-  } catch (error) {
-    console.error('Supabase profile fetch error:', error);
+  if (error) {
     return (
       <PageContainer>
         <div className="rounded-[2rem] bg-white/90 p-8 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 text-center">
           <p className="text-lg font-semibold text-slate-900">Tietoja ei voitu ladata</p>
-          <p className="mt-2 text-sm leading-7 text-slate-600">
-            Yritä hetken kuluttua uudelleen.
-          </p>
+          <p className="mt-2 text-sm leading-7 text-slate-600">{error}</p>
         </div>
       </PageContainer>
     );
@@ -104,10 +151,30 @@ export default async function ProfilePage() {
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {latestGigs.length > 0 ? (
-            latestGigs.map((gig) => <GigCard key={gig.id} gig={gig} />)
+            latestGigs.map((gig) => (
+              <div key={gig.id} className="space-y-3">
+                <GigCard gig={gig} />
+                <div className="flex flex-wrap gap-3">
+                  <a
+                    href={`/profile/edit/${gig.id}`}
+                    className="inline-flex flex-1 items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                  >
+                    Muokkaa
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(gig.id)}
+                    disabled={deletingId === gig.id}
+                    className="inline-flex flex-1 items-center justify-center rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
+                  >
+                    {deletingId === gig.id ? 'Poistetaan...' : 'Poista'}
+                  </button>
+                </div>
+              </div>
+            ))
           ) : (
             <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
-              Keikkoja ei löytynyt.
+              Sinulla ei ole vielä keikkoja. Luo ensimmäinen keikka profiilista.
             </div>
           )}
         </div>

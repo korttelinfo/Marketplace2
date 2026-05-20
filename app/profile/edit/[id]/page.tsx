@@ -1,12 +1,19 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import PageContainer from '../../components/PageContainer';
-import { formCategories } from '../../lib/mockGigs';
-import { supabase } from '../../lib/supabase';
+import PageContainer from '../../../../components/PageContainer';
+import { formCategories } from '../../../../lib/mockGigs';
+import { supabase } from '../../../../lib/supabase';
+import type { BrowseGig } from '../../../../lib/mockGigs';
 
-export default function CreatePage() {
+type Props = {
+  params: {
+    id: string;
+  };
+};
+
+export default function EditGigPage({ params }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -14,66 +21,78 @@ export default function CreatePage() {
   const [budget, setBudget] = useState('');
   const [location, setLocation] = useState('');
   const [dateTime, setDateTime] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [messageType, setMessageType] = useState<'success' | 'error' | null>(null);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-
-      if (!data.session) {
+    const loadGig = async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
         router.replace('/login');
         return;
       }
 
-      setUserId(data.session.user.id);
-      setCheckingAuth(false);
+      const userId = sessionData.session.user.id;
+      const { data, error } = await supabase
+        .from<BrowseGig>('gigs')
+        .select('id,title,category,budget,location,date_time,description,status,user_id')
+        .eq('id', params.id)
+        .eq('user_id', userId)
+        .single();
+
+      if (error || !data) {
+        console.error('Supabase edit load error:', error);
+        setError('Keikkaa ei löytynyt tai sinulla ei ole oikeutta muokata sitä.');
+        setLoading(false);
+        return;
+      }
+
+      setTitle(data.title);
+      setDescription(data.description);
+      setCategory(data.category);
+      setBudget(data.budget);
+      setLocation(data.location);
+      setDateTime(data.date_time);
+      setLoading(false);
     };
 
-    checkAuth();
-  }, [router]);
+    loadGig();
+  }, [params.id, router]);
 
-  const handleSubmit = async () => {
-    if (isSubmitting || !userId) return;
+  const handleSave = async () => {
+    if (saving) return;
 
-    setIsSubmitting(true);
-    setMessage(null);
-    setMessageType(null);
+    setSaving(true);
+    setError(null);
 
-    const { error } = await supabase.from('gigs').insert({
-      title,
-      description,
-      category,
-      budget,
-      location,
-      date_time: dateTime,
-      user_id: userId,
-    });
+    const { error } = await supabase
+      .from('gigs')
+      .update({
+        title,
+        description,
+        category,
+        budget,
+        location,
+        date_time: dateTime,
+      })
+      .eq('id', params.id);
 
     if (error) {
-      console.error('Supabase insert error:', error);
-      setMessage('Tapahtui virhe keikan lisäämisessä. Yritä uudelleen.');
-      setMessageType('error');
-      setIsSubmitting(false);
+      console.error('Supabase update error:', error);
+      setError('Keikan päivitys epäonnistui. Yritä uudelleen.');
+      setSaving(false);
       return;
     }
 
-    setMessage('Keikka lisätty! Ohjataan selaamaan keikkoja...');
-    setMessageType('success');
-
-    window.setTimeout(() => {
-      router.push('/browse');
-    }, 800);
+    router.push('/profile');
   };
 
-  if (checkingAuth) {
+  if (loading) {
     return (
       <PageContainer contentClassName="max-w-3xl">
-        <div className="rounded-[2rem] bg-white/90 p-6 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 sm:p-8 text-center text-slate-500">
-          Tarkistetaan kirjautuneisuutta...
+        <div className="rounded-[2rem] bg-white/90 p-8 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 text-center text-slate-500">
+          Keikkaa ladataan...
         </div>
       </PageContainer>
     );
@@ -83,16 +102,14 @@ export default function CreatePage() {
     <PageContainer contentClassName="max-w-3xl">
       <div className="rounded-[2rem] bg-white/90 p-6 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 sm:p-8">
         <div className="space-y-4 text-center sm:text-left">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Luo keikka</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-            Julkaise uusi arjen apukeikka.
-          </h1>
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Muokkaa keikkaa</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Muokkaa keikkaa</h1>
           <p className="mx-auto max-w-2xl text-base leading-7 text-slate-600 sm:mx-0">
-            Täytä tiedot nopeasti, niin naapurit näkevät tarpeesi ja voivat tarjoutua auttamaan.
+            Päivitä keikan tiedot ja tallenna muutokset. Vain sinun omat keikkasi voi muokata.
           </p>
         </div>
 
-        <form className="mt-8 space-y-6">
+        <form className="mt-8 space-y-6" onSubmit={(event) => { event.preventDefault(); handleSave(); }}>
           <div className="grid gap-6 sm:grid-cols-2">
             <label className="block">
               <span className="mb-2 block text-sm font-semibold text-slate-700">Otsikko</span>
@@ -169,25 +186,18 @@ export default function CreatePage() {
             </label>
           </div>
 
-          {message ? (
-            <div
-              className={`rounded-3xl border px-4 py-3 text-sm ${
-                messageType === 'success'
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  : 'border-rose-200 bg-rose-50 text-rose-700'
-              }`}
-            >
-              {message}
+          {error ? (
+            <div className="rounded-3xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {error}
             </div>
           ) : null}
 
           <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSubmitting}
+            type="submit"
+            disabled={saving}
             className="inline-flex w-full justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
           >
-            {isSubmitting ? 'Lähetetään...' : 'Lähetä keikka'}
+            {saving ? 'Tallennetaan...' : 'Tallenna muutokset'}
           </button>
         </form>
       </div>
