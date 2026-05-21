@@ -177,6 +177,39 @@ export default function InboxThreadPage() {
     loadThread();
   }, [params.id]);
 
+  const updateWorkflow = async (
+    updates: Partial<InboxResponse>,
+    systemMessage?: string
+  ) => {
+    if (!response || !currentUserId) return;
+
+    const { error: updateError } = await supabase
+      .from('gig_responses')
+      .update(updates)
+      .eq('id', response.id);
+
+    if (updateError) {
+      console.error(updateError);
+      return;
+    }
+
+    if (systemMessage) {
+      const { error: messageError } = await supabase
+        .from('gig_response_messages')
+        .insert({
+          response_id: response.id,
+          sender_id: currentUserId,
+          message: systemMessage,
+        });
+
+      if (messageError) {
+        console.error('System message insert error:', messageError);
+      }
+    }
+
+    await loadThread();
+  };
+
   const handleReply = async () => {
     if (
       !response ||
@@ -206,22 +239,6 @@ export default function InboxThreadPage() {
     setReplyMessage('');
     await loadThread();
     setSendingReply(false);
-  };
-
-  const updateWorkflow = async (updates: Partial<InboxResponse>) => {
-    if (!response) return;
-
-    const { error: updateError } = await supabase
-      .from('gig_responses')
-      .update(updates)
-      .eq('id', response.id);
-
-    if (updateError) {
-      console.error(updateError);
-      return;
-    }
-
-    await loadThread();
   };
 
   if (loading) {
@@ -333,10 +350,13 @@ export default function InboxThreadPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    updateWorkflow({
-                      workflow_status: 'agreement_requested',
-                      agreement_requested_by: currentUserId,
-                    })
+                    updateWorkflow(
+                      {
+                        workflow_status: 'agreement_requested',
+                        agreement_requested_by: currentUserId,
+                      },
+                      'Sopimusta ehdotettiin. Odotetaan toisen osapuolen hyväksyntää.'
+                    )
                   }
                   className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
                 >
@@ -354,9 +374,12 @@ export default function InboxThreadPage() {
                     <button
                       type="button"
                       onClick={() =>
-                        updateWorkflow({
-                          workflow_status: 'active',
-                        })
+                        updateWorkflow(
+                          {
+                            workflow_status: 'active',
+                          },
+                          'Sopimus hyväksyttiin. Ilmoitus on nyt meneillään.'
+                        )
                       }
                       className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
                     >
@@ -366,10 +389,13 @@ export default function InboxThreadPage() {
                     <button
                       type="button"
                       onClick={() =>
-                        updateWorkflow({
-                          workflow_status: 'agreement_rejected',
-                          agreement_requested_by: null,
-                        })
+                        updateWorkflow(
+                          {
+                            workflow_status: 'agreement_rejected',
+                            agreement_requested_by: null,
+                          },
+                          'Sopimusehdotus hylättiin. Keskustelua voi jatkaa.'
+                        )
                       }
                       className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-400"
                     >
@@ -383,9 +409,12 @@ export default function InboxThreadPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    updateWorkflow({
-                      workflow_status: 'completed',
-                    })
+                    updateWorkflow(
+                      {
+                        workflow_status: 'completed',
+                      },
+                      'Ilmoitus merkittiin suoritetuksi.'
+                    )
                   }
                   className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
                 >
@@ -406,10 +435,13 @@ export default function InboxThreadPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    updateWorkflow({
-                      workflow_status: 'cancelled',
-                      cancelled_at: new Date().toISOString(),
-                    })
+                    updateWorkflow(
+                      {
+                        workflow_status: 'cancelled',
+                        cancelled_at: new Date().toISOString(),
+                      },
+                      'Keskustelu lopetettiin. Uusia viestejä ei voi enää lähettää.'
+                    )
                   }
                   className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
                 >
