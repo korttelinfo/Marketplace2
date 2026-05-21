@@ -8,6 +8,13 @@ import ConfirmModal from '../../components/ConfirmModal';
 import { supabase } from '../../lib/supabase';
 import type { BrowseGig } from '../../lib/mockGigs';
 
+type Profile = {
+  display_name: string | null;
+  location: string | null;
+  bio: string | null;
+  created_at: string | null;
+};
+
 export default function ProfilePage() {
   const router = useRouter();
   const [gigs, setGigs] = useState<BrowseGig[]>([]);
@@ -52,13 +59,49 @@ export default function ProfilePage() {
         setGigs(data ?? []);
       }
 
-      // Attempt to load an optional `profiles` table for richer user info
-      const { data: profileData } = await supabase.from('profiles').select('full_name,location').eq('id', userId).single();
-      if (profileData) {
-        setDisplayName(profileData.full_name ?? email);
-        setProfileLocation(profileData.location ?? null);
-      } else {
-        setDisplayName(email);
+      const profileResult = await supabase
+        .from('profiles')
+        .select('display_name,location,bio,created_at')
+        .eq('id', userId)
+        .single();
+
+      const profileData = profileResult.data as Profile | null;
+      const profileError = profileResult.error;
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error('Supabase profile fetch error:', profileError);
+        setError('Profiilin latauksessa tapahtui virhe. Yritä uudelleen.');
+      }
+
+      if (!profileData) {
+        const { error: insertError } = await supabase.from('profiles').insert({
+          id: userId,
+          display_name: null,
+          location: null,
+          bio: null,
+          created_at: new Date().toISOString(),
+        });
+
+        if (insertError) {
+          console.error('Supabase profile create error:', insertError);
+          setError('Profiilin luonti epäonnistui. Yritä uudelleen.');
+          setLoading(false);
+          return;
+        }
+
+        router.replace('/onboarding');
+        return;
+      }
+
+      setDisplayName(profileData.display_name ?? email);
+      setProfileLocation(profileData.location ?? null);
+      if (!profileData.display_name || !profileData.location || !profileData.bio) {
+        router.replace('/onboarding');
+        return;
+      }
+
+      if (profileData.created_at) {
+        setMemberSince(String(new Date(profileData.created_at).getFullYear()));
       }
 
       setLoading(false);
