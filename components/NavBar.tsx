@@ -52,10 +52,10 @@ export default function NavBar() {
   const isLoggedIn = Boolean(session?.user);
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/95 backdrop-blur-md shadow-sm shadow-slate-100">
+    <nav className="sticky top-0 z-40 hidden border-b border-slate-200/70 bg-white/95 backdrop-blur-md shadow-sm shadow-slate-100 md:block">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-6 lg:px-8">
         <Link href="/" className="text-lg font-semibold tracking-tight text-slate-900">
-          Korttelinfo
+          Kortteli
         </Link>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -73,14 +73,14 @@ export default function NavBar() {
               onClick={handleSignOut}
               className="rounded-full border border-slate-200 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
             >
-              Logout
+              Poistu
             </button>
           ) : (
             <Link
               href="/login"
               className={navLinkClass(pathname === '/login')}
             >
-              Login
+              Kirjaudu
             </Link>
           )}
 

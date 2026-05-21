@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import PageContainer from '../../components/PageContainer';
 import GigCard from '../../components/GigCard';
 import { browseCategories, type BrowseGig } from '../../lib/mockGigs';
@@ -114,6 +115,21 @@ export default function BrowsePage() {
         ) : error ? (
           <div className="mt-8 rounded-[2rem] border border-red-200 bg-red-50 p-6 text-center text-red-700">
             {error}
+          </div>
+        ) : filteredGigs.length === 0 ? (
+          <div className="mt-8 rounded-[2rem] border border-slate-200 bg-slate-50 p-8 text-center">
+            <p className="text-lg font-semibold text-slate-900">Ei keikkoja löytynyt</p>
+            <p className="mt-2 text-sm text-slate-600">
+              {query || activeCategory !== 'Kaikki'
+                ? 'Yritä muuttaa hakusanoja tai valitse eri kategoria.'
+                : 'Tule takaisin myöhemmin - uusia keikkoja lisätään jatkuvasti!'}
+            </p>
+            <Link
+              href="/create"
+              className="mt-6 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+            >
+              Luo ensimmäinen keikka
+            </Link>
           </div>
         ) : (
           <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
