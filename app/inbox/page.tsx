@@ -11,6 +11,7 @@ type InboxMessage = {
   response_id: string;
   sender_id: string;
   message: string;
+  read_at: string | null;
   created_at: string;
 };
 
@@ -21,6 +22,7 @@ type InboxResponse = {
   owner_id: string;
   message: string;
   status: string;
+  read_at: string | null;
   created_at: string;
   messages?: InboxMessage[];
   gigs?:
@@ -39,25 +41,22 @@ type InboxResponse = {
     | null;
 };
 
+type ConversationItem = InboxResponse & {
+  latestMessage: string;
+  latestAt: string;
+  latestSenderId: string;
+  unread: boolean;
+};
+
 export default function InboxPage() {
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<'received' | 'sent'>('received');
-  const [received, setReceived] = useState<InboxResponse[]>([]);
-  const [sent, setSent] = useState<InboxResponse[]>([]);
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   function getGigInfo(item: InboxResponse) {
     return Array.isArray(item.gigs) ? item.gigs[0] : item.gigs;
-  }
-
-  function getLatestMessage(item: InboxResponse) {
-    if (item.messages && item.messages.length > 0) {
-      return item.messages[item.messages.length - 1].message;
-    }
-
-    return item.message;
   }
 
   const loadInbox = async () => {
@@ -73,7 +72,7 @@ export default function InboxPage() {
 
     const userId = sessionData.session.user.id;
 
-    const receivedResult = await supabase
+    const responsesResult = await supabase
       .from('gig_responses')
       .select(`
         id,
@@ -82,6 +81,7 @@ export default function InboxPage() {
         owner_id,
         message,
         status,
+        read_at,
         created_at,
         gigs (
           title,
@@ -90,43 +90,18 @@ export default function InboxPage() {
           listing_type
         )
       `)
-      .eq('owner_id', userId)
+      .or(`sender_id.eq.${userId},owner_id.eq.${userId}`)
       .order('created_at', { ascending: false });
 
-    const sentResult = await supabase
-      .from('gig_responses')
-      .select(`
-        id,
-        gig_id,
-        sender_id,
-        owner_id,
-        message,
-        status,
-        created_at,
-        gigs (
-          title,
-          category,
-          location,
-          listing_type
-        )
-      `)
-      .eq('sender_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (receivedResult.error || sentResult.error) {
-      console.error('Inbox fetch error:', receivedResult.error ?? sentResult.error);
-
+    if (responsesResult.error) {
+      console.error('Inbox fetch error:', responsesResult.error);
       setError('Yhteydenottojen lataus epäonnistui.');
       setLoading(false);
       return;
     }
 
-    const receivedData = (receivedResult.data as InboxResponse[]) ?? [];
-    const sentData = (sentResult.data as InboxResponse[]) ?? [];
-
-    const allResponses = [...receivedData, ...sentData];
-
-    const responseIds = allResponses.map((item) => item.id);
+    const responseData = (responsesResult.data as InboxResponse[]) ?? [];
+    const responseIds = responseData.map((item) => item.id);
 
     let messagesByResponse: Record<string, InboxMessage[]> = {};
 
@@ -137,7 +112,9 @@ export default function InboxPage() {
         .in('response_id', responseIds)
         .order('created_at', { ascending: true });
 
-      if (!messagesResult.error) {
+      if (messagesResult.error) {
+        console.error('Message fetch error:', messagesResult.error);
+      } else {
         for (const msg of (messagesResult.data as InboxMessage[]) ?? []) {
           if (!messagesByResponse[msg.response_id]) {
             messagesByResponse[msg.response_id] = [];
@@ -148,28 +125,39 @@ export default function InboxPage() {
       }
     }
 
-    setReceived(
-      receivedData.map((item) => ({
-        ...item,
-        messages: messagesByResponse[item.id] ?? [],
-      }))
-    );
+    const mapped = responseData.map((item) => {
+      const messages = messagesByResponse[item.id] ?? [];
+      const latestReply = messages[messages.length - 1];
 
-    setSent(
-      sentData.map((item) => ({
-        ...item,
-        messages: messagesByResponse[item.id] ?? [],
-      }))
-    );
+      const latestMessage = latestReply?.message ?? item.message;
+      const latestAt = latestReply?.created_at ?? item.created_at;
+      const latestSenderId = latestReply?.sender_id ?? item.sender_id;
 
+      const unread =
+        latestSenderId !== userId &&
+        (latestReply ? !latestReply.read_at : !item.read_at);
+
+      return {
+        ...item,
+        messages,
+        latestMessage,
+        latestAt,
+        latestSenderId,
+        unread,
+      };
+    });
+
+    mapped.sort((a, b) => {
+      return new Date(b.latestAt).getTime() - new Date(a.latestAt).getTime();
+    });
+
+    setConversations(mapped);
     setLoading(false);
   };
 
   useEffect(() => {
     loadInbox();
   }, []);
-
-  const currentItems = activeTab === 'received' ? received : sent;
 
   if (loading) {
     return (
@@ -185,13 +173,8 @@ export default function InboxPage() {
     return (
       <PageContainer>
         <div className="rounded-[2rem] bg-white/90 p-8 text-center shadow-lg shadow-slate-200/60 ring-1 ring-slate-200">
-          <p className="text-lg font-semibold text-slate-900">
-            Postilaatikkoa ei voitu ladata
-          </p>
-
-          <p className="mt-2 text-sm text-slate-600">
-            {error}
-          </p>
+          <p className="text-lg font-semibold text-slate-900">Postilaatikkoa ei voitu ladata</p>
+          <p className="mt-2 text-sm text-slate-600">{error}</p>
         </div>
       </PageContainer>
     );
@@ -201,94 +184,98 @@ export default function InboxPage() {
     <PageContainer>
       <div className="space-y-8">
         <section className="rounded-[2rem] bg-white/90 p-6 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 sm:p-8">
-          <div className="space-y-4">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
-              Postilaatikko
-            </p>
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Postilaatikko
+          </p>
 
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-              Keskustelut
-            </h1>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+            Keskustelut
+          </h1>
 
-            <p className="max-w-2xl text-sm leading-7 text-slate-600">
-              Avaa keskustelu nähdäksesi viestiketjun ja vastataksesi.
-            </p>
-          </div>
-
-          <div className="mt-8 rounded-[1.5rem] bg-slate-100 p-1">
-            <div className="grid grid-cols-2 gap-1">
-              <button
-                type="button"
-                onClick={() => setActiveTab('received')}
-                className={`rounded-full px-4 py-3 text-sm font-semibold transition ${
-                  activeTab === 'received'
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                Saapuneet ({received.length})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('sent')}
-                className={`rounded-full px-4 py-3 text-sm font-semibold transition ${
-                  activeTab === 'sent'
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                Lähetetyt ({sent.length})
-              </button>
-            </div>
-          </div>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+            Kaikki keskustelut näkyvät yhdessä listassa. Uusimmat ja lukemattomat nousevat esiin.
+          </p>
         </section>
 
         <section className="space-y-4">
-          {currentItems.length > 0 ? (
-            currentItems.map((item) => (
-              <Link
-                key={item.id}
-                href={`/inbox/${item.id}`}
-                className="block rounded-[2rem] border border-slate-200 bg-white/90 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-lg font-semibold text-slate-900">
-                      {getGigInfo(item)?.title ?? 'Ilmoitus'}
-                    </h2>
+          {conversations.length > 0 ? (
+            conversations.map((item) => {
+              const gig = getGigInfo(item);
+              const isOwnLatest = item.latestSenderId !== item.owner_id && item.latestSenderId !== item.sender_id
+                ? false
+                : false;
 
-                    <p className="mt-1 text-sm text-slate-500">
-                      {getGigInfo(item)?.category ?? 'Kategoria'} ·{' '}
-                      {getGigInfo(item)?.location ?? 'Sijainti'}
-                    </p>
+              return (
+                <Link
+                  key={item.id}
+                  href={`/inbox/${item.id}`}
+                  className={`block rounded-[2rem] border p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                    item.unread
+                      ? 'border-orange-200 bg-orange-50/80 ring-1 ring-orange-100'
+                      : 'border-slate-200 bg-white/90'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        {item.unread ? (
+                          <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
+                        ) : null}
 
-                    <p className="mt-4 line-clamp-2 text-sm leading-7 text-slate-700">
-                      {getLatestMessage(item)}
-                    </p>
+                        <h2
+                          className={`text-lg text-slate-900 ${
+                            item.unread ? 'font-bold' : 'font-semibold'
+                          }`}
+                        >
+                          {gig?.title ?? 'Ilmoitus'}
+                        </h2>
+                      </div>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        {gig?.category ?? 'Kategoria'} · {gig?.location ?? 'Sijainti'}
+                      </p>
+
+                      <p
+                        className={`mt-4 line-clamp-2 text-sm leading-7 ${
+                          item.unread ? 'font-semibold text-slate-900' : 'text-slate-700'
+                        }`}
+                      >
+                        {item.latestSenderId === item.sender_id ? 'Aloittaja: ' : 'Julkaisija: '}
+                        {item.latestMessage}
+                      </p>
+                    </div>
+
+                    <div className="flex shrink-0 flex-col items-end gap-3">
+                      {item.unread ? (
+                        <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
+                          Uusi
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                          {item.status === 'pending' ? 'Odottaa' : item.status}
+                        </span>
+                      )}
+
+                      <p className="text-xs text-slate-500">
+                        {new Date(item.latestAt).toLocaleDateString('fi-FI')}
+                      </p>
+                    </div>
                   </div>
-
-                  <div className="flex flex-col items-end gap-3">
-                    <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                      {item.status === 'pending' ? 'Odottaa' : item.status}
-                    </span>
-
-                    <p className="text-xs text-slate-500">
-                      {new Date(item.created_at).toLocaleDateString('fi-FI')}
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            ))
+                </Link>
+              );
+            })
           ) : (
             <div className="rounded-[2rem] border border-slate-200 bg-white/90 p-8 text-center shadow-sm">
-              <p className="text-lg font-semibold text-slate-900">
-                Ei keskusteluja
-              </p>
-
+              <p className="text-lg font-semibold text-slate-900">Ei keskusteluja</p>
               <p className="mt-2 text-sm leading-7 text-slate-600">
-                Keskustelut näkyvät täällä, kun otat yhteyttä ilmoituksiin.
+                Keskustelut näkyvät täällä, kun otat yhteyttä ilmoituksiin tai joku vastaa sinun ilmoitukseesi.
               </p>
+              <Link
+                href="/browse"
+                className="mt-6 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+              >
+                Selaa ilmoituksia
+              </Link>
             </div>
           )}
         </section>

@@ -11,6 +11,7 @@ type InboxMessage = {
   response_id: string;
   sender_id: string;
   message: string;
+  read_at: string | null;
   created_at: string;
 };
 
@@ -21,6 +22,7 @@ type InboxResponse = {
   owner_id: string;
   message: string;
   status: string;
+  read_at: string | null;
   created_at: string;
   gigs?:
     | {
@@ -57,6 +59,28 @@ export default function InboxThreadPage() {
     return Array.isArray(item.gigs) ? item.gigs[0] : item.gigs;
   }
 
+  const markAsRead = async (responseData: InboxResponse, userId: string, threadMessages: InboxMessage[]) => {
+    const now = new Date().toISOString();
+
+    if (responseData.sender_id !== userId && !responseData.read_at) {
+      await supabase
+        .from('gig_responses')
+        .update({ read_at: now })
+        .eq('id', responseData.id);
+    }
+
+    const unreadMessageIds = threadMessages
+      .filter((msg) => msg.sender_id !== userId && !msg.read_at)
+      .map((msg) => msg.id);
+
+    if (unreadMessageIds.length > 0) {
+      await supabase
+        .from('gig_response_messages')
+        .update({ read_at: now })
+        .in('id', unreadMessageIds);
+    }
+  };
+
   const loadThread = async () => {
     setLoading(true);
     setError(null);
@@ -82,6 +106,7 @@ export default function InboxThreadPage() {
         owner_id,
         message,
         status,
+        read_at,
         created_at,
         gigs (
           title,
@@ -121,8 +146,26 @@ export default function InboxThreadPage() {
       return;
     }
 
-    setResponse(responseData);
-    setMessages((messagesResult.data as InboxMessage[]) ?? []);
+    const threadMessages = (messagesResult.data as InboxMessage[]) ?? [];
+
+    await markAsRead(responseData, userId, threadMessages);
+
+    setResponse({
+      ...responseData,
+      read_at:
+        responseData.sender_id !== userId
+          ? responseData.read_at ?? new Date().toISOString()
+          : responseData.read_at,
+    });
+
+    setMessages(
+      threadMessages.map((msg) =>
+        msg.sender_id !== userId && !msg.read_at
+          ? { ...msg, read_at: new Date().toISOString() }
+          : msg
+      )
+    );
+
     setLoading(false);
   };
 
@@ -170,14 +213,8 @@ export default function InboxThreadPage() {
     return (
       <PageContainer>
         <div className="rounded-[2rem] bg-white/90 p-8 text-center shadow-lg shadow-slate-200/60 ring-1 ring-slate-200">
-          <p className="text-lg font-semibold text-slate-900">
-            Keskustelua ei voitu ladata
-          </p>
-
-          <p className="mt-2 text-sm text-slate-600">
-            {error ?? 'Keskustelua ei löytynyt.'}
-          </p>
-
+          <p className="text-lg font-semibold text-slate-900">Keskustelua ei voitu ladata</p>
+          <p className="mt-2 text-sm text-slate-600">{error ?? 'Keskustelua ei löytynyt.'}</p>
           <Link
             href="/inbox"
             className="mt-6 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
@@ -190,7 +227,6 @@ export default function InboxThreadPage() {
   }
 
   const gigInfo = getGigInfo(response);
-
   const firstMessageIsOwn = response.sender_id === currentUserId;
 
   return (
@@ -209,11 +245,9 @@ export default function InboxThreadPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
                 Keskustelu
               </p>
-
               <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
                 {gigInfo?.title ?? 'Ilmoitus'}
               </h1>
-
               <p className="mt-3 text-sm text-slate-500">
                 {gigInfo?.category ?? 'Kategoria'} · {gigInfo?.location ?? 'Sijainti'}
               </p>
@@ -240,11 +274,7 @@ export default function InboxThreadPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-70">
                 Ensimmäinen yhteydenotto
               </p>
-
-              <p className="mt-2 text-sm leading-7">
-                {response.message}
-              </p>
-
+              <p className="mt-2 text-sm leading-7">{response.message}</p>
               <p className="mt-3 text-xs opacity-70">
                 {new Date(response.created_at).toLocaleDateString('fi-FI')}
               </p>
@@ -262,10 +292,7 @@ export default function InboxThreadPage() {
                       : 'bg-slate-100 text-slate-900'
                   }`}
                 >
-                  <p className="text-sm leading-7">
-                    {msg.message}
-                  </p>
-
+                  <p className="text-sm leading-7">{msg.message}</p>
                   <p className="mt-3 text-xs opacity-70">
                     {new Date(msg.created_at).toLocaleDateString('fi-FI')}
                   </p>
@@ -279,7 +306,6 @@ export default function InboxThreadPage() {
               <span className="mb-2 block text-sm font-semibold text-slate-700">
                 Vastaa keskusteluun
               </span>
-
               <textarea
                 value={replyMessage}
                 onChange={(event) => setReplyMessage(event.target.value)}
