@@ -9,7 +9,7 @@ import { supabase } from '../../lib/supabase';
 export default function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const recoveryMode = searchParams?.get('type') === 'recovery';
+  const [recoveryMode, setRecoveryMode] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,15 +20,24 @@ export default function ResetPasswordPage() {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [hasSession, setHasSession] = useState(false);
 
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      setHasSession(!!data.session);
-      setSessionChecked(true);
-    };
+useEffect(() => {
+  const checkSession = async () => {
+    const hash = window.location.hash;
+    const queryType = searchParams?.get('type');
 
-    checkSession();
-  }, []);
+    setRecoveryMode(
+      queryType === 'recovery' ||
+      hash.includes('type=recovery')
+    );
+
+    const { data } = await supabase.auth.getSession();
+
+    setHasSession(!!data.session);
+    setSessionChecked(true);
+  };
+
+  checkSession();
+}, [searchParams]);
 
   const handleSendReset = async () => {
     setLoading(true);
@@ -87,6 +96,16 @@ export default function ResetPasswordPage() {
       router.push('/login?reset_success=1');
     }, 2500);
   };
+
+  if (!sessionChecked) {
+  return (
+    <PageContainer contentClassName="max-w-3xl">
+      <p className="text-slate-600">
+        Tarkistetaan palautuslinkkiä...
+      </p>
+    </PageContainer>
+  );
+}
 
   const canShowRecoveryForm = recoveryMode || hasSession;
 
