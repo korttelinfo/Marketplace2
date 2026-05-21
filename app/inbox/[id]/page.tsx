@@ -61,6 +61,7 @@ export default function InboxThreadPage() {
   const [workflowLoading, setWorkflowLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   function getGigInfo(item: InboxResponse | null) {
     if (!item) return null;
@@ -316,26 +317,20 @@ export default function InboxThreadPage() {
   };
 
   const handleDeleteForMe = async () => {
-    if (!response || !currentUserId) return;
+  if (!response || !currentUserId) return;
 
-    const confirmed = window.confirm(
-      'Poistetaanko keskustelu omasta postilaatikostasi? Keskustelu säilyy järjestelmässä väärinkäytösten selvittämistä varten.'
-    );
+  const updates =
+    response.sender_id === currentUserId
+      ? { sender_deleted_at: new Date().toISOString() }
+      : { owner_deleted_at: new Date().toISOString() };
 
-    if (!confirmed) return;
+  await supabase
+    .from('gig_responses')
+    .update(updates)
+    .eq('id', response.id);
 
-    const updates =
-      response.sender_id === currentUserId
-        ? { sender_deleted_at: new Date().toISOString() }
-        : { owner_deleted_at: new Date().toISOString() };
-
-    await supabase
-      .from('gig_responses')
-      .update(updates)
-      .eq('id', response.id);
-
-    router.push('/inbox');
-  };
+  router.push('/inbox');
+};
 
   const handleReply = async () => {
     if (
@@ -447,8 +442,8 @@ export default function InboxThreadPage() {
               </Link>
 
               <button
-                type="button"
-                onClick={handleDeleteForMe}
+  type="button"
+  onClick={() => setDeleteConfirmOpen(true)}
                 className="inline-flex items-center justify-center rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
               >
                 Poista keskustelu
@@ -632,6 +627,41 @@ export default function InboxThreadPage() {
           </div>
         </section>
       </div>
+      {deleteConfirmOpen ? (
+  <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center">
+    <div className="w-full max-w-md rounded-[2rem] bg-white p-6 shadow-xl ring-1 ring-slate-200">
+      <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
+        Poista keskustelu
+      </p>
+
+      <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
+        Haluatko poistaa tämän keskustelun?
+      </h2>
+
+      <p className="mt-3 text-sm leading-7 text-slate-600">
+        Keskustelu poistuu sinun postilaatikostasi. Se säilyy järjestelmässä mahdollisia väärinkäytösten selvityksiä varten.
+      </p>
+
+      <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={() => setDeleteConfirmOpen(false)}
+          className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+        >
+          Peruuta
+        </button>
+
+        <button
+          type="button"
+          onClick={handleDeleteForMe}
+          className="rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
+        >
+          Poista keskustelu
+        </button>
+      </div>
+    </div>
+  </div>
+) : null}
     </PageContainer>
   );
 }
