@@ -22,8 +22,16 @@ type InboxResponse = {
   owner_id: string;
   message: string;
   status: string;
+
+  workflow_status?: string | null;
+  agreement_requested_by?: string | null;
+  requester_completed_at?: string | null;
+  owner_completed_at?: string | null;
+  cancelled_at?: string | null;
+
   read_at: string | null;
   created_at: string;
+
   gigs?:
     | {
         title: string | null;
@@ -59,7 +67,36 @@ export default function InboxThreadPage() {
     return Array.isArray(item.gigs) ? item.gigs[0] : item.gigs;
   }
 
-  const markAsRead = async (responseData: InboxResponse, userId: string, threadMessages: InboxMessage[]) => {
+  function getWorkflowLabel(status?: string | null) {
+    switch (status) {
+      case 'agreement_requested':
+        return 'Sopimusta ehdotettu';
+
+      case 'agreement_rejected':
+        return 'Sopimus hylätty';
+
+      case 'active':
+        return 'Meneillään';
+
+      case 'completed':
+        return 'Suoritettu';
+
+      case 'cancelled':
+        return 'Lopetettu';
+
+      case 'archived':
+        return 'Arkistoitu';
+
+      default:
+        return 'Keskustelu käynnissä';
+    }
+  }
+
+  const markAsRead = async (
+    responseData: InboxResponse,
+    userId: string,
+    threadMessages: InboxMessage[]
+  ) => {
     const now = new Date().toISOString();
 
     if (responseData.sender_id !== userId && !responseData.read_at) {
@@ -106,6 +143,11 @@ export default function InboxThreadPage() {
         owner_id,
         message,
         status,
+        workflow_status,
+        agreement_requested_by,
+        requester_completed_at,
+        owner_completed_at,
+        cancelled_at,
         read_at,
         created_at,
         gigs (
@@ -120,6 +162,7 @@ export default function InboxThreadPage() {
 
     if (responseResult.error || !responseResult.data) {
       console.error('Thread fetch error:', responseResult.error);
+
       setError('Keskustelua ei voitu ladata.');
       setLoading(false);
       return;
@@ -127,7 +170,10 @@ export default function InboxThreadPage() {
 
     const responseData = responseResult.data as InboxResponse;
 
-    if (responseData.sender_id !== userId && responseData.owner_id !== userId) {
+    if (
+      responseData.sender_id !== userId &&
+      responseData.owner_id !== userId
+    ) {
       setError('Sinulla ei ole oikeutta nähdä tätä keskustelua.');
       setLoading(false);
       return;
@@ -141,6 +187,7 @@ export default function InboxThreadPage() {
 
     if (messagesResult.error) {
       console.error('Messages fetch error:', messagesResult.error);
+
       setError('Viestejä ei voitu ladata.');
       setLoading(false);
       return;
@@ -174,7 +221,12 @@ export default function InboxThreadPage() {
   }, [params.id]);
 
   const handleReply = async () => {
-    if (!response || !replyMessage.trim() || !currentUserId) {
+    if (
+      !response ||
+      !replyMessage.trim() ||
+      !currentUserId ||
+      response.workflow_status === 'cancelled'
+    ) {
       return;
     }
 
@@ -213,8 +265,14 @@ export default function InboxThreadPage() {
     return (
       <PageContainer>
         <div className="rounded-[2rem] bg-white/90 p-8 text-center shadow-lg shadow-slate-200/60 ring-1 ring-slate-200">
-          <p className="text-lg font-semibold text-slate-900">Keskustelua ei voitu ladata</p>
-          <p className="mt-2 text-sm text-slate-600">{error ?? 'Keskustelua ei löytynyt.'}</p>
+          <p className="text-lg font-semibold text-slate-900">
+            Keskustelua ei voitu ladata
+          </p>
+
+          <p className="mt-2 text-sm text-slate-600">
+            {error ?? 'Keskustelua ei löytynyt.'}
+          </p>
+
           <Link
             href="/inbox"
             className="mt-6 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
@@ -245,11 +303,14 @@ export default function InboxThreadPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
                 Keskustelu
               </p>
+
               <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
                 {gigInfo?.title ?? 'Ilmoitus'}
               </h1>
+
               <p className="mt-3 text-sm text-slate-500">
-                {gigInfo?.category ?? 'Kategoria'} · {gigInfo?.location ?? 'Sijainti'}
+                {gigInfo?.category ?? 'Kategoria'} ·{' '}
+                {gigInfo?.location ?? 'Sijainti'}
               </p>
             </div>
 
@@ -274,7 +335,11 @@ export default function InboxThreadPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-70">
                 Ensimmäinen yhteydenotto
               </p>
-              <p className="mt-2 text-sm leading-7">{response.message}</p>
+
+              <p className="mt-2 text-sm leading-7">
+                {response.message}
+              </p>
+
               <p className="mt-3 text-xs opacity-70">
                 {new Date(response.created_at).toLocaleDateString('fi-FI')}
               </p>
@@ -292,7 +357,10 @@ export default function InboxThreadPage() {
                       : 'bg-slate-100 text-slate-900'
                   }`}
                 >
-                  <p className="text-sm leading-7">{msg.message}</p>
+                  <p className="text-sm leading-7">
+                    {msg.message}
+                  </p>
+
                   <p className="mt-3 text-xs opacity-70">
                     {new Date(msg.created_at).toLocaleDateString('fi-FI')}
                   </p>
@@ -301,16 +369,97 @@ export default function InboxThreadPage() {
             })}
           </div>
 
+          <div className="mt-6 border-t border-slate-200 pt-6">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
+                {getWorkflowLabel(response.workflow_status)}
+              </span>
+
+              {response.workflow_status === 'pending' ? (
+                <button
+                  type="button"
+                  className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                >
+                  Merkitse sovituksi
+                </button>
+              ) : null}
+
+              {response.workflow_status === 'agreement_requested' ? (
+                <>
+                  <button
+                    type="button"
+                    className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                  >
+                    Hyväksy sopimus
+                  </button>
+
+                  <button
+                    type="button"
+                    className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-400"
+                  >
+                    Hylkää
+                  </button>
+                </>
+              ) : null}
+
+              {response.workflow_status === 'active' ? (
+                <button
+                  type="button"
+                  className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                >
+                  Merkitse suoritetuksi
+                </button>
+              ) : null}
+
+              {response.workflow_status === 'completed' ? (
+                <button
+                  type="button"
+                  className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
+                >
+                  Anna arvio
+                </button>
+              ) : null}
+
+              {response.workflow_status !== 'cancelled' &&
+              response.workflow_status !== 'completed' ? (
+                <button
+                  type="button"
+                  className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                >
+                  Lopeta keskustelu
+                </button>
+              ) : null}
+            </div>
+
+            {response.workflow_status === 'cancelled' ? (
+              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4">
+                <p className="text-sm font-semibold text-red-700">
+                  Tämä keskustelu on lopetettu.
+                </p>
+
+                <p className="mt-1 text-sm text-red-600">
+                  Uusia viestejä ei voi enää lähettää.
+                </p>
+              </div>
+            ) : null}
+          </div>
+
           <div className="mt-6 border-t border-slate-200 pt-5">
             <label className="block">
               <span className="mb-2 block text-sm font-semibold text-slate-700">
                 Vastaa keskusteluun
               </span>
+
               <textarea
                 value={replyMessage}
                 onChange={(event) => setReplyMessage(event.target.value)}
+                disabled={response.workflow_status === 'cancelled'}
                 rows={4}
-                placeholder="Kirjoita viesti..."
+                placeholder={
+                  response.workflow_status === 'cancelled'
+                    ? 'Keskustelu on lopetettu'
+                    : 'Kirjoita viesti...'
+                }
                 className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
               />
             </label>
@@ -319,7 +468,11 @@ export default function InboxThreadPage() {
               <button
                 type="button"
                 onClick={handleReply}
-                disabled={sendingReply || !replyMessage.trim()}
+                disabled={
+                  sendingReply ||
+                  !replyMessage.trim() ||
+                  response.workflow_status === 'cancelled'
+                }
                 className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {sendingReply ? 'Lähetetään...' : 'Lähetä vastaus'}
