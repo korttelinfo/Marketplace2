@@ -24,25 +24,69 @@ const navItems: NavItem[] = [
 export default function BottomNav() {
   const pathname = usePathname() ?? '/';
   const [session, setSession] = useState<Session | null>(null);
+  const [hasUnread, setHasUnread] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
+    const loadSessionAndUnread = async () => {
+      const { data } = await supabase.auth.getSession();
+
       if (!mounted) return;
+
       setSession(data.session);
-    });
+
+      if (!data.session) {
+        setHasUnread(false);
+        return;
+      }
+
+      const userId = data.session.user.id;
+
+      const responsesResult = await supabase
+        .from('gig_responses')
+        .select('id')
+        .eq('owner_id', userId)
+        .is('read_at', null)
+        .limit(1);
+
+      const messagesResult = await supabase
+        .from('gig_response_messages')
+        .select(`
+          id,
+          sender_id,
+          read_at,
+          gig_responses!inner (
+            sender_id,
+            owner_id
+          )
+        `)
+        .neq('sender_id', userId)
+        .is('read_at', null)
+        .or(`sender_id.eq.${userId},owner_id.eq.${userId}`, {
+          foreignTable: 'gig_responses',
+        })
+        .limit(1);
+
+      const unreadResponses = responsesResult.data?.length ?? 0;
+      const unreadMessages = messagesResult.data?.length ?? 0;
+
+      setHasUnread(unreadResponses + unreadMessages > 0);
+    };
+
+    loadSessionAndUnread();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!mounted) return;
       setSession(newSession ?? null);
+      loadSessionAndUnread();
     });
 
     return () => {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [pathname]);
 
   const isLoggedIn = Boolean(session?.user);
 
@@ -61,18 +105,26 @@ export default function BottomNav() {
       <div className="mx-auto flex h-16 max-w-full items-center justify-around px-2">
         {visibleNavItems.map((item) => {
           const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+          const showUnreadDot = item.href === '/inbox' && hasUnread;
 
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-xs font-medium transition ${
+              className={`relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-xs font-medium transition ${
                 isActive
                   ? 'bg-slate-100 text-slate-900'
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              <span className="text-lg">{item.icon}</span>
+              <span className="relative text-lg">
+                {item.icon}
+
+                {showUnreadDot ? (
+                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-white" />
+                ) : null}
+              </span>
+
               <span className="line-clamp-1">{item.label}</span>
             </Link>
           );

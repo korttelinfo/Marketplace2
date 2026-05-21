@@ -32,31 +32,76 @@ export default function NavBar() {
   const router = useRouter();
 
   const [session, setSession] = useState<Session | null>(null);
+  const [hasUnread, setHasUnread] = useState(false);
+
+  const loadSessionAndUnread = async () => {
+    const { data } = await supabase.auth.getSession();
+
+    setSession(data.session);
+
+    if (!data.session) {
+      setHasUnread(false);
+      return;
+    }
+
+    const userId = data.session.user.id;
+
+    const responsesResult = await supabase
+      .from('gig_responses')
+      .select('id')
+      .eq('owner_id', userId)
+      .is('read_at', null)
+      .limit(1);
+
+    const messagesResult = await supabase
+      .from('gig_response_messages')
+      .select(`
+        id,
+        sender_id,
+        read_at,
+        gig_responses!inner (
+          sender_id,
+          owner_id
+        )
+      `)
+      .neq('sender_id', userId)
+      .is('read_at', null)
+      .or(`sender_id.eq.${userId},owner_id.eq.${userId}`, {
+        foreignTable: 'gig_responses',
+      })
+      .limit(1);
+
+    const unreadResponses = responsesResult.data?.length ?? 0;
+    const unreadMessages = messagesResult.data?.length ?? 0;
+
+    setHasUnread(unreadResponses + unreadMessages > 0);
+  };
 
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
+    const run = async () => {
       if (!mounted) return;
-      setSession(data.session);
-    });
+      await loadSessionAndUnread();
+    };
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
-        if (!mounted) return;
-        setSession(newSession ?? null);
-      }
-    );
+    run();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+      if (!mounted) return;
+      loadSessionAndUnread();
+    });
 
     return () => {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [pathname]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setSession(null);
+    setHasUnread(false);
     router.push('/');
   };
 
@@ -83,13 +128,19 @@ export default function NavBar() {
                 ? pathname === '/'
                 : pathname.startsWith(link.href);
 
+            const showUnreadDot = link.href === '/inbox' && hasUnread;
+
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={navLinkClass(isActive)}
+                className={`${navLinkClass(isActive)} relative`}
               >
                 {link.label}
+
+                {showUnreadDot ? (
+                  <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-white" />
+                ) : null}
               </Link>
             );
           })}
