@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageContainer from '../../components/PageContainer';
@@ -183,12 +184,12 @@ export default function ProfilePage() {
             ) : null}
 
             <div className="mt-4">
-              <a
+              <Link
                 href="/profile/edit"
                 className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
               >
                 Muokkaa profiilia
-              </a>
+              </Link>
             </div>
           </div>
 
