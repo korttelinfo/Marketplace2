@@ -179,6 +179,14 @@ export default function ProfilePage() {
   const openGigs = gigs.filter((gig) => gig.status?.toLowerCase() === 'vapaa').length;
   const latestGigs = gigs.slice(0, 6);
 
+  const initials =
+  displayName
+    ?.split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() || 'KT';
+    
   const sortNewestFirst = (items: BrowseGig[]) =>
   [...items].sort((a, b) => {
     const aTime = a.date_time ? new Date(a.date_time).getTime() : 0;
