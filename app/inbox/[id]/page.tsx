@@ -210,7 +210,20 @@ export default function InboxThreadPage() {
   useEffect(() => {
     loadThread();
   }, [params.id]);
+const updateGigStatus = async (status: string) => {
+  if (!response) return;
 
+  const { error } = await supabase
+    .from('gigs')
+    .update({
+      status,
+    })
+    .eq('id', response.gig_id);
+
+  if (error) {
+    console.error('Gig status update error:', error);
+  }
+};
   const updateWorkflow = async (
     updates: Partial<InboxResponse>,
     systemMessage?: string
@@ -249,56 +262,74 @@ export default function InboxThreadPage() {
   };
 
   const handleRequestAgreement = async () => {
-    await updateWorkflow(
-      {
-        workflow_status: 'agreement_requested',
-        agreement_requested_by: currentUserId,
-      },
-      'Sopimusta ehdotettiin. Odotetaan toisen osapuolen hyväksyntää.'
-    );
-  };
+  await updateWorkflow(
+    {
+      workflow_status: 'agreement_requested',
+      agreement_requested_by: currentUserId,
+    },
+    'Sopimusta ehdotettiin. Odotetaan toisen osapuolen hyväksyntää.'
+  );
+
+  await updateGigStatus('pending_agreement');
+};
 
   const handleApproveAgreement = async () => {
-    await updateWorkflow(
-      {
-        workflow_status: 'active',
-      },
-      'Sopimus hyväksyttiin. Ilmoitus on nyt meneillään.'
-    );
-  };
+  await updateWorkflow(
+    {
+      workflow_status: 'active',
+    },
+    'Sopimus hyväksyttiin. Ilmoitus on nyt meneillään.'
+  );
+
+  await updateGigStatus('active');
+};
 
   const handleRejectAgreement = async () => {
-    await updateWorkflow(
-      {
-        workflow_status: 'agreement_rejected',
-        agreement_requested_by: null,
-      },
-      'Sopimusehdotus hylättiin. Keskustelua voi jatkaa.'
-    );
-  };
+  await updateWorkflow(
+    {
+      workflow_status: 'agreement_rejected',
+      agreement_requested_by: null,
+    },
+    'Sopimusehdotus hylättiin. Keskustelua voi jatkaa.'
+  );
+
+  await updateGigStatus('vapaa');
+};
 
   const handleMarkCompleted = async () => {
-    if (!response || !currentUserId) return;
+  if (!response || !currentUserId) return;
 
-    const now = new Date().toISOString();
-    const requesterCompletedAt =
-      response.sender_id === currentUserId ? now : response.requester_completed_at;
-    const ownerCompletedAt =
-      response.owner_id === currentUserId ? now : response.owner_completed_at;
+  const now = new Date().toISOString();
 
-    const completedByBoth = Boolean(requesterCompletedAt && ownerCompletedAt);
+  const requesterCompletedAt =
+    response.sender_id === currentUserId
+      ? now
+      : response.requester_completed_at;
 
-    await updateWorkflow(
-      {
-        requester_completed_at: requesterCompletedAt,
-        owner_completed_at: ownerCompletedAt,
-        workflow_status: completedByBoth ? 'completed' : 'active',
-      },
-      completedByBoth
-        ? 'Ilmoitus merkittiin suoritetuksi molempien osapuolten toimesta.'
-        : 'Toinen osapuoli merkitsi ilmoituksen suoritetuksi. Odotetaan vielä toisen kuittausta.'
-    );
-  };
+  const ownerCompletedAt =
+    response.owner_id === currentUserId
+      ? now
+      : response.owner_completed_at;
+
+  const completedByBoth = Boolean(
+    requesterCompletedAt && ownerCompletedAt
+  );
+
+  await updateWorkflow(
+    {
+      requester_completed_at: requesterCompletedAt,
+      owner_completed_at: ownerCompletedAt,
+      workflow_status: completedByBoth ? 'completed' : 'active',
+    },
+    completedByBoth
+      ? 'Ilmoitus merkittiin suoritetuksi molempien osapuolten toimesta.'
+      : 'Toinen osapuoli merkitsi ilmoituksen suoritetuksi. Odotetaan vielä toisen kuittausta.'
+  );
+
+  if (completedByBoth) {
+    await updateGigStatus('completed');
+  }
+};
 
   const handleCancelConversation = async () => {
     const confirmed = window.confirm(
