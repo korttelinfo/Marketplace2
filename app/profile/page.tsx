@@ -179,14 +179,44 @@ export default function ProfilePage() {
   const openGigs = gigs.filter((gig) => gig.status?.toLowerCase() === 'vapaa').length;
   const latestGigs = gigs.slice(0, 6);
 
-  const initials =
-    displayName
-      ?.split(' ')
-      .map((part) => part[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase() || 'KT';
+  const sortNewestFirst = (items: BrowseGig[]) =>
+  [...items].sort((a, b) => {
+    const aTime = a.date_time ? new Date(a.date_time).getTime() : 0;
+    const bTime = b.date_time ? new Date(b.date_time).getTime() : 0;
+    return bTime - aTime;
+  });
 
+const activeGigs = sortNewestFirst(
+  gigs.filter((gig) => {
+    const status = gig.status?.toLowerCase() ?? '';
+    return status === 'vapaa' || status === 'aktiivinen' || status === 'open';
+  })
+).slice(0, 2);
+
+const ongoingGigs = sortNewestFirst(
+  gigs.filter((gig) => {
+    const status = gig.status?.toLowerCase() ?? '';
+    return (
+      status === 'sovittu' ||
+      status === 'hyväksytty' ||
+      status === 'meneillään' ||
+      status === 'accepted' ||
+      status === 'in_progress'
+    );
+  })
+).slice(0, 2);
+
+const completedGigs = sortNewestFirst(
+  gigs.filter((gig) => {
+    const status = gig.status?.toLowerCase() ?? '';
+    return (
+      status === 'valmis' ||
+      status === 'suoritettu' ||
+      status === 'completed' ||
+      status === 'done'
+    );
+  })
+).slice(0, 2);
   return (
     <PageContainer>
       <div className="space-y-8">
@@ -277,114 +307,68 @@ export default function ProfilePage() {
         </section>
 
         <section className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight text-slate-950">
-                Aktiiviset ilmoitukset
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Hallitse omia ilmoituksiasi nopeasti.
-              </p>
-            </div>
+  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+        Omat ilmoitukset
+      </h2>
+      <p className="mt-1 text-sm text-slate-500">
+        Tuoreimmat ilmoitukset ja työnkulut yhdessä näkymässä.
+      </p>
+    </div>
 
-            <Link
-              href="/create"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-            >
-              <Plus size={17} />
-              Luo ilmoitus
-            </Link>
-          </div>
+    <Link
+      href="/create"
+      className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+    >
+      <Plus size={17} />
+      Luo ilmoitus
+    </Link>
+  </div>
 
-          {latestGigs.length > 0 ? (
-            <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-              {latestGigs.map((gig) => {
-                const listingType = (gig as any).listing_type;
-                const isOffer = listingType === 'offer';
+  <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+    <div className="grid divide-y divide-slate-200 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+      <ListingColumn
+        title="Aktiiviset ilmoitukset"
+        count={activeGigs.length}
+        gigs={activeGigs}
+        emptyText="Ei aktiivisia ilmoituksia"
+        tone="green"
+        deletingId={deletingId}
+        onDelete={handleDelete}
+      />
 
-                return (
-                  <article
-                    key={gig.id}
-                    className="flex flex-col gap-4 border-b border-slate-100 p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                            isOffer
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-orange-100 text-orange-700'
-                          }`}
-                        >
-                          {isOffer ? 'Tarjoan' : 'Tarvitsen'}
-                        </span>
+      <ListingColumn
+        title="Meneillään olevat"
+        count={ongoingGigs.length}
+        gigs={ongoingGigs}
+        emptyText="Ei meneillään olevia"
+        tone="blue"
+        deletingId={deletingId}
+        onDelete={handleDelete}
+      />
 
-                        {gig.status ? (
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                            {gig.status}
-                          </span>
-                        ) : null}
+      <ListingColumn
+        title="Valmiit / hyväksytyt"
+        count={completedGigs.length}
+        gigs={completedGigs}
+        emptyText="Ei valmiita ilmoituksia"
+        tone="purple"
+        deletingId={deletingId}
+        onDelete={handleDelete}
+      />
+    </div>
 
-                        {gig.location ? (
-                          <span className="flex items-center gap-1 text-xs text-slate-500">
-                            <MapPin size={13} />
-                            {gig.location}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <h3 className="mt-2 truncate text-base font-semibold text-slate-950">
-                        {gig.title}
-                      </h3>
-
-                      <p className="mt-1 text-sm text-slate-500">
-                        {gig.budget ? `${gig.budget} €` : 'Sovitaan yhdessä'}
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 sm:w-[260px]">
-                      <Link
-                        href={`/gig/${gig.id}`}
-                        className="inline-flex items-center justify-center rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
-                      >
-                        Katso
-                      </Link>
-
-                      <Link
-                        href={`/profile/edit/${gig.id}`}
-                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
-                      >
-                        Muokkaa
-                      </Link>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(gig.id)}
-                        disabled={deletingId === gig.id}
-                        className="inline-flex items-center justify-center rounded-full bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
-                      >
-                        {deletingId === gig.id ? '...' : 'Poista'}
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="rounded-[2rem] border border-slate-200 bg-white/90 p-8 text-center shadow-sm">
-              <p className="text-lg font-semibold text-slate-900">Ei vielä ilmoituksia</p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
-                Luo ensimmäinen ilmoitus, jos tarvitset apua tai haluat tarjoutua auttamaan lähialueella.
-              </p>
-              <Link
-                href="/create"
-                className="mt-6 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
-              >
-                Luo ilmoitus
-              </Link>
-            </div>
-          )}
-        </section>
+    <div className="border-t border-slate-100 px-5 py-4 text-center">
+      <Link
+        href="/profile/listings"
+        className="text-sm font-semibold text-slate-700 transition hover:text-slate-950"
+      >
+        Näytä kaikki ilmoitukset →
+      </Link>
+    </div>
+  </div>
+</section>
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -529,7 +513,116 @@ function ReviewRow({
     </article>
   );
 }
+function ListingColumn({
+  title,
+  count,
+  gigs,
+  emptyText,
+  tone,
+  deletingId,
+  onDelete,
+}: {
+  title: string;
+  count: number;
+  gigs: BrowseGig[];
+  emptyText: string;
+  tone: 'green' | 'blue' | 'purple';
+  deletingId: string | null;
+  onDelete: (id: string) => void;
+}) {
+  const toneClasses = {
+    green: 'bg-emerald-100 text-emerald-700',
+    blue: 'bg-blue-100 text-blue-700',
+    purple: 'bg-purple-100 text-purple-700',
+  };
 
+  return (
+    <div className="min-h-[210px] p-5">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold text-slate-950">{title}</h3>
+        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${toneClasses[tone]}`}>
+          {count}
+        </span>
+      </div>
+
+      {gigs.length > 0 ? (
+        <div className="space-y-3">
+          {gigs.map((gig) => {
+            const listingType = (gig as any).listing_type;
+            const isOffer = listingType === 'offer';
+
+            return (
+              <div
+                key={gig.id}
+                className="rounded-2xl border border-slate-100 bg-slate-50/70 p-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          isOffer
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-orange-100 text-orange-700'
+                        }`}
+                      >
+                        {isOffer ? 'Tarjoan' : 'Tarvitsen'}
+                      </span>
+
+                      {gig.status ? (
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                          {gig.status}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <h4 className="truncate text-sm font-bold text-slate-950">
+                      {gig.title}
+                    </h4>
+
+                    <p className="mt-1 truncate text-xs text-slate-500">
+                      {gig.location ? `${gig.location} · ` : ''}
+                      {gig.budget ? `${gig.budget} €` : 'Sovitaan yhdessä'}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => onDelete(gig.id)}
+                    disabled={deletingId === gig.id}
+                    className="shrink-0 rounded-full px-2 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:text-rose-300"
+                  >
+                    {deletingId === gig.id ? '...' : 'Poista'}
+                  </button>
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <Link
+                    href={`/gig/${gig.id}`}
+                    className="flex-1 rounded-full bg-slate-950 px-3 py-1.5 text-center text-xs font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    Katso
+                  </Link>
+
+                  <Link
+                    href={`/profile/edit/${gig.id}`}
+                    className="flex-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-center text-xs font-semibold text-slate-900 transition hover:bg-slate-50"
+                  >
+                    Muokkaa
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex h-[140px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 text-center text-sm text-slate-400">
+          {emptyText}
+        </div>
+      )}
+    </div>
+  );
+}
 function SummaryRow({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="flex items-center justify-between gap-4">
