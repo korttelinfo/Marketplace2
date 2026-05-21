@@ -11,11 +11,14 @@ type Props = {
 };
 
 export default async function BrowseGigPage({ params }: Props) {
-  const { data: gig, error } = await supabase
-    .from<BrowseGig>('gigs')
+  const result = await supabase
+    .from('gigs')
     .select('id,title,category,budget,location,date_time,description,status')
     .eq('id', params.id)
     .maybeSingle();
+
+  const gig = result.data as BrowseGig | null;
+  const error = result.error;
 
   if (error) {
     console.error('Supabase gig fetch error:', error);

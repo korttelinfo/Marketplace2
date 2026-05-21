@@ -10,7 +10,7 @@ export default function CreatePage() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState(formCategories[0]);
+  const [category, setCategory] = useState<string>(formCategories[0]);
   const [budget, setBudget] = useState('');
   const [location, setLocation] = useState('');
   const [dateTime, setDateTime] = useState('');

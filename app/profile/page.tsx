@@ -36,11 +36,14 @@ export default function ProfilePage() {
 
       const createdAt = sessionData.session.user.created_at;
       if (createdAt) setMemberSince(String(new Date(createdAt).getFullYear()));
-      const { data, error } = await supabase
-        .from<BrowseGig>('gigs')
+      const result = await supabase
+        .from('gigs')
         .select('id,title,category,budget,location,date_time,description,status')
         .eq('user_id', userId)
         .order('date_time', { ascending: false });
+
+      const data = result.data as BrowseGig[] | null;
+      const error = result.error;
 
       if (error) {
         console.error('Supabase profile fetch error:', error);

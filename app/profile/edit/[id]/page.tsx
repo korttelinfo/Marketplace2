@@ -17,7 +17,7 @@ export default function EditGigPage({ params }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState(formCategories[0]);
+  const [category, setCategory] = useState<string>(formCategories[0]);
   const [budget, setBudget] = useState('');
   const [location, setLocation] = useState('');
   const [dateTime, setDateTime] = useState('');
@@ -34,12 +34,15 @@ export default function EditGigPage({ params }: Props) {
       }
 
       const userId = sessionData.session.user.id;
-      const { data, error } = await supabase
-        .from<BrowseGig>('gigs')
+      const result = await supabase
+        .from('gigs')
         .select('id,title,category,budget,location,date_time,description,status,user_id')
         .eq('id', params.id)
         .eq('user_id', userId)
         .single();
+
+      const data = result.data as BrowseGig | null;
+      const error = result.error;
 
       if (error || !data) {
         console.error('Supabase edit load error:', error);
