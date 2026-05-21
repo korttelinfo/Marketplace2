@@ -5,16 +5,16 @@ import { landingCategories, landingGigs } from '../lib/mockGigs';
 export default function Home() {
   return (
     <PageContainer>
-      <section className="grid gap-10 rounded-[2rem] bg-white/90 p-6 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 sm:p-10">
+      <section className="space-y-10 rounded-[2rem] bg-white/90 p-6 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 sm:p-10">
         <div className="space-y-6 text-center sm:text-left">
-          <p className="inline-flex rounded-full bg-slate-100 px-4 py-1 text-sm font-semibold text-slate-700 ring-1 ring-slate-200">
-            Hyperlocal marketplace
+          <p className="inline-flex rounded-full bg-amber-50 px-4 py-1 text-sm font-semibold text-amber-800 ring-1 ring-amber-100">
+            Korttelin arjen apu
           </p>
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
-            Arjen apu lähelläsi.
+            Apua arkeen läheltäsi.
           </h1>
           <p className="mx-auto max-w-2xl text-base leading-8 text-slate-600 sm:mx-0 sm:text-lg">
-            Etsi, tarjoa ja hallitse pieniä keikkoja oman naapuruston sisällä. Puhtaasti paikallinen, selkeä ja luotettava tapa tehdä arjesta kevyempää.
+            Löydä ja tarjoa arkiapua omassa korttelissasi. Kortteli yhdistää naapuruston ihmiset helposti, turvallisesti ja ilman turhaa byrokratiaa.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
             <a
@@ -27,7 +27,7 @@ export default function Home() {
               href="/create"
               className="inline-flex justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
             >
-              Luo keikka
+              Julkaise keikka
             </a>
           </div>
         </div>
@@ -43,6 +43,34 @@ export default function Home() {
               <p className="mt-2 text-sm leading-6 text-slate-600">{category.description}</p>
             </article>
           ))}
+        </div>
+
+        <div className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-6 sm:grid-cols-3">
+          <article className="space-y-3">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">1. Kerro tarpeestasi</p>
+            <h3 className="text-xl font-semibold text-slate-900">Lisää keikka nopeasti</h3>
+            <p className="text-sm leading-6 text-slate-600">Kirjoita lyhyt kuvaus ja sijainti, niin naapurit näkevät helposti mistä on kyse.</p>
+          </article>
+          <article className="space-y-3">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">2. Yhdistä naapurien kanssa</p>
+            <h3 className="text-xl font-semibold text-slate-900">Lähelläsi oleva apu</h3>
+            <p className="text-sm leading-6 text-slate-600">Löydä lähialueella asuvat ihmiset, jotka voivat auttaa sinua arjen askareissa.</p>
+          </article>
+          <article className="space-y-3">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">3. Hoida yhdessä</p>
+            <h3 className="text-xl font-semibold text-slate-900">Helppo ja luotettava</h3>
+            <p className="text-sm leading-6 text-slate-600">Sovi aikataulu, hinta ja toteutus yhdessä. Kortteli pitää yhteydenoton yksinkertaisena.</p>
+          </article>
+        </div>
+
+        <div className="rounded-[1.75rem] border border-slate-200 bg-slate-950 px-6 py-8 text-white sm:px-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.32em] text-amber-200">Luotettava kortteliyhteisö</p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Yksinkertaista paikallista apua.</h2>
+            <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
+              Kortteli pitää askeleet selkeinä ja yhteydenoton läpinäkyvänä. Voit luottaa siihen, että apu löytyy läheltä ja yhteisö toimii rehdisti.
+            </p>
+          </div>
         </div>
       </section>
 
