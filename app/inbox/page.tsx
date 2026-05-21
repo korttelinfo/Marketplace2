@@ -48,15 +48,16 @@ export default function InboxPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [replyOpen, setReplyOpen] = useState(false);
-  const [selectedResponse, setSelectedResponse] = useState<InboxResponse | null>(null);
-  const [replyMessage, setReplyMessage] = useState('');
-  const [sendingReply, setSendingReply] = useState(false);
-
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
   function getGigInfo(item: InboxResponse) {
     return Array.isArray(item.gigs) ? item.gigs[0] : item.gigs;
+  }
+
+  function getLatestMessage(item: InboxResponse) {
+    if (item.messages && item.messages.length > 0) {
+      return item.messages[item.messages.length - 1].message;
+    }
+
+    return item.message;
   }
 
   const loadInbox = async () => {
@@ -71,8 +72,6 @@ export default function InboxPage() {
     }
 
     const userId = sessionData.session.user.id;
-
-    setCurrentUserId(userId);
 
     const receivedResult = await supabase
       .from('gig_responses')
@@ -117,7 +116,7 @@ export default function InboxPage() {
     if (receivedResult.error || sentResult.error) {
       console.error('Inbox fetch error:', receivedResult.error ?? sentResult.error);
 
-      setError('Yhteydenottojen lataus epäonnistui. Yritä uudelleen.');
+      setError('Yhteydenottojen lataus epäonnistui.');
       setLoading(false);
       return;
     }
@@ -170,36 +169,6 @@ export default function InboxPage() {
     loadInbox();
   }, []);
 
-  const handleReply = async () => {
-    if (!selectedResponse || !replyMessage.trim() || !currentUserId) {
-      return;
-    }
-
-    setSendingReply(true);
-
-    const { error: insertError } = await supabase
-      .from('gig_response_messages')
-      .insert({
-        response_id: selectedResponse.id,
-        sender_id: currentUserId,
-        message: replyMessage.trim(),
-      });
-
-    if (insertError) {
-      console.error('Reply insert error:', insertError);
-      setSendingReply(false);
-      return;
-    }
-
-    setReplyMessage('');
-    setReplyOpen(false);
-    setSelectedResponse(null);
-
-    await loadInbox();
-
-    setSendingReply(false);
-  };
-
   const currentItems = activeTab === 'received' ? received : sent;
 
   if (loading) {
@@ -238,11 +207,11 @@ export default function InboxPage() {
             </p>
 
             <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-              Yhteydenotot yhdessä paikassa.
+              Keskustelut
             </h1>
 
             <p className="max-w-2xl text-sm leading-7 text-slate-600">
-              Näet täällä sekä sinulle tulleet yhteydenotot että omat lähettämäsi viestit.
+              Avaa keskustelu nähdäksesi viestiketjun ja vastataksesi.
             </p>
           </div>
 
@@ -278,156 +247,52 @@ export default function InboxPage() {
         <section className="space-y-4">
           {currentItems.length > 0 ? (
             currentItems.map((item) => (
-              <article
+              <Link
                 key={item.id}
-                className="rounded-[2rem] border border-slate-200 bg-white/90 p-6 shadow-sm"
+                href={`/inbox/${item.id}`}
+                className="block rounded-[2rem] border border-slate-200 bg-white/90 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-                      {activeTab === 'received'
-                        ? 'Saapunut yhteydenotto'
-                        : 'Lähetetty yhteydenotto'}
-                    </p>
-
-                    <h2 className="mt-3 text-xl font-semibold text-slate-900">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-lg font-semibold text-slate-900">
                       {getGigInfo(item)?.title ?? 'Ilmoitus'}
                     </h2>
 
-                    <p className="mt-2 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-slate-500">
                       {getGigInfo(item)?.category ?? 'Kategoria'} ·{' '}
                       {getGigInfo(item)?.location ?? 'Sijainti'}
                     </p>
-                  </div>
 
-                  <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                    {item.status === 'pending' ? 'Odottaa' : item.status}
-                  </span>
-                </div>
-
-                <div className="mt-5 space-y-3">
-                  <div className="rounded-[1.5rem] bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Ensimmäinen yhteydenotto
-                    </p>
-
-                    <p className="mt-2 text-sm leading-7 text-slate-700">
-                      {item.message}
+                    <p className="mt-4 line-clamp-2 text-sm leading-7 text-slate-700">
+                      {getLatestMessage(item)}
                     </p>
                   </div>
 
-                  {item.messages?.map((msg) => {
-                    const isOwn = msg.sender_id === currentUserId;
+                  <div className="flex flex-col items-end gap-3">
+                    <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                      {item.status === 'pending' ? 'Odottaa' : item.status}
+                    </span>
 
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`rounded-[1.5rem] p-4 ${
-                          isOwn
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-slate-100 text-slate-900'
-                        }`}
-                      >
-                        <p className="text-sm leading-7">
-                          {msg.message}
-                        </p>
-
-                        <p
-                          className={`mt-3 text-xs ${
-                            isOwn ? 'text-slate-300' : 'text-slate-500'
-                          }`}
-                        >
-                          {new Date(msg.created_at).toLocaleDateString('fi-FI')}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedResponse(item);
-                        setReplyOpen(true);
-                      }}
-                      className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-                    >
-                      Vastaa
-                    </button>
-
-                    <Link
-                      href={`/browse/${item.gig_id}`}
-                      className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
-                    >
-                      Avaa ilmoitus
-                    </Link>
+                    <p className="text-xs text-slate-500">
+                      {new Date(item.created_at).toLocaleDateString('fi-FI')}
+                    </p>
                   </div>
-
-                  <p className="text-xs text-slate-500">
-                    {new Date(item.created_at).toLocaleDateString('fi-FI')}
-                  </p>
                 </div>
-              </article>
+              </Link>
             ))
           ) : (
             <div className="rounded-[2rem] border border-slate-200 bg-white/90 p-8 text-center shadow-sm">
               <p className="text-lg font-semibold text-slate-900">
-                {activeTab === 'received'
-                  ? 'Ei saapuneita yhteydenottoja'
-                  : 'Ei lähetettyjä yhteydenottoja'}
+                Ei keskusteluja
               </p>
 
               <p className="mt-2 text-sm leading-7 text-slate-600">
-                {activeTab === 'received'
-                  ? 'Kun joku vastaa ilmoitukseesi, viesti näkyy täällä.'
-                  : 'Kun otat yhteyttä toisen ilmoitukseen, viesti näkyy täällä.'}
+                Keskustelut näkyvät täällä, kun otat yhteyttä ilmoituksiin.
               </p>
             </div>
           )}
         </section>
       </div>
-
-      {replyOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center">
-          <div className="w-full max-w-lg rounded-[2rem] bg-white p-6 shadow-xl">
-            <h2 className="text-2xl font-semibold text-slate-900">
-              Vastaa viestiin
-            </h2>
-
-            <textarea
-              value={replyMessage}
-              onChange={(event) => setReplyMessage(event.target.value)}
-              rows={5}
-              placeholder="Kirjoita vastauksesi..."
-              className="mt-5 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-            />
-
-            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setReplyOpen(false);
-                  setSelectedResponse(null);
-                }}
-                className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
-              >
-                Peruuta
-              </button>
-
-              <button
-                type="button"
-                onClick={handleReply}
-                disabled={sendingReply}
-                className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-              >
-                {sendingReply ? 'Lähetetään...' : 'Lähetä vastaus'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </PageContainer>
   );
 }
