@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageContainer from '../../components/PageContainer';
 import GigCard from '../../components/GigCard';
+import ConfirmModal from '../../components/ConfirmModal';
 import { supabase } from '../../lib/supabase';
 import type { BrowseGig } from '../../lib/mockGigs';
 
@@ -13,6 +14,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [profileLocation, setProfileLocation] = useState<string | null>(null);
@@ -61,10 +64,13 @@ export default function ProfilePage() {
     loadUserGigs();
   }, [router]);
 
-  const handleDelete = async (id: string) => {
-    const confirmed = window.confirm('Haluatko varmasti poistaa tämän keikan?');
-    if (!confirmed) return;
+  const handleDelete = (id: string) => {
+    // open confirmation modal
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
+  };
 
+  const performDelete = async (id: string) => {
     setDeletingId(id);
     const { error } = await supabase.from('gigs').delete().eq('id', id);
 
@@ -77,6 +83,13 @@ export default function ProfilePage() {
 
     setGigs((current) => current.filter((gig) => gig.id !== id));
     setDeletingId(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    setConfirmOpen(false);
+    await performDelete(pendingDeleteId);
+    setPendingDeleteId(null);
   };
 
   if (loading) {
@@ -181,7 +194,7 @@ export default function ProfilePage() {
                   </a>
                   <button
                     type="button"
-                    onClick={() => handleDelete(gig.id)}
+                      onClick={() => handleDelete(gig.id)}
                     disabled={deletingId === gig.id}
                     className="inline-flex flex-1 items-center justify-center rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
                   >
@@ -197,6 +210,17 @@ export default function ProfilePage() {
           )}
         </div>
       </section>
+      <ConfirmModal
+        open={confirmOpen}
+        title="Poista keikka"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setPendingDeleteId(null);
+        }}
+      >
+        Haluatko varmasti poistaa tämän keikan? Toimintoa ei voi peruuttaa.
+      </ConfirmModal>
     </PageContainer>
   );
 }
