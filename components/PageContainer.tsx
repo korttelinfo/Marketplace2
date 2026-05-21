@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import NavBar from './NavBar';
-import BottomNav from './BottomNav';
 
 type PageContainerProps = {
   children: ReactNode;
@@ -19,7 +18,6 @@ export default function PageContainer({
       <div className={`mx-auto px-5 py-8 pb-24 sm:pb-8 sm:px-6 lg:px-8 ${contentClassName}`}>
         {children}
       </div>
-      <BottomNav />
     </main>
   );
 }
