@@ -82,16 +82,17 @@ export default function CreatePage() {
           ? 'Ilmainen'
           : 'Sovitaan yhdessä';
 
-    const { error } = await supabase.from('gigs').insert({
-      title,
-      description,
-      category,
-      budget: compensationText,
-      location,
-      date_time: urgency,
-      user_id: userId,
-      listing_type: listingType,
-    });
+   const { error } = await supabase.from('gigs').insert({
+  title,
+  description,
+  category,
+  budget: compensationText,
+  location,
+  date_time: urgency,
+  user_id: userId,
+  listing_type: listingType,
+  status: 'vapaa',
+});
 
     if (error) {
       console.error('Supabase insert error:', error);

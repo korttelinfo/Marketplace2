@@ -27,10 +27,10 @@ export default function BrowsePage() {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await supabase
+     const { data, error: fetchError } = await supabase
   .from('gigs')
   .select('id,title,category,budget,location,date_time,description,status,listing_type')
-  .eq('status', 'vapaa');
+  .or('status.eq.vapaa,status.is.null');
 
       if (fetchError) {
         console.error('Supabase fetch error:', fetchError);
