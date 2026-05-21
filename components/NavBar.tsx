@@ -78,7 +78,7 @@ export default function NavBar() {
           ) : (
             <Link
               href="/login"
-              className="rounded-full px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
+              className={navLinkClass(pathname === '/login')}
             >
               Login
             </Link>
