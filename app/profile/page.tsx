@@ -26,7 +26,10 @@ export default function ProfilePage() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [profileLocation, setProfileLocation] = useState<string | null>(null);
+  const [bio, setBio] = useState<string | null>(null);
   const [memberSince, setMemberSince] = useState<string | null>(null);
+
+  const profileIncomplete = !displayName || !profileLocation || !bio;
 
   useEffect(() => {
     const loadUserGigs = async () => {
@@ -89,19 +92,16 @@ export default function ProfilePage() {
           return;
         }
 
-        router.replace('/onboarding');
-        return;
-      }
-
-      setDisplayName(profileData.display_name ?? email);
-      setProfileLocation(profileData.location ?? null);
-      if (!profileData.display_name || !profileData.location || !profileData.bio) {
-        router.replace('/onboarding');
-        return;
-      }
-
-      if (profileData.created_at) {
-        setMemberSince(String(new Date(profileData.created_at).getFullYear()));
+        setDisplayName(null);
+        setProfileLocation(null);
+        setBio(null);
+      } else {
+        setDisplayName(profileData.display_name);
+        setProfileLocation(profileData.location);
+        setBio(profileData.bio);
+        if (profileData.created_at) {
+          setMemberSince(String(new Date(profileData.created_at).getFullYear()));
+        }
       }
 
       setLoading(false);
@@ -171,9 +171,25 @@ export default function ProfilePage() {
           <div className="space-y-4">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Oma profiili</p>
             <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{displayName ?? userEmail ?? 'Profiili'}</h1>
+            <p className="max-w-2xl text-sm leading-7 text-slate-600">{userEmail}</p>
             <p className="max-w-2xl text-sm leading-7 text-slate-600">
               {profileLocation ?? 'Helsinki'} · Jäsen vuodesta {memberSince ?? '2026'}
             </p>
+            {profileIncomplete ? (
+              <div className="mt-4 rounded-[1.75rem] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <p className="font-semibold">Täydennä profiilisi tiedot.</p>
+                <p className="mt-2 text-slate-700">Lisää nimi, sijainti ja lyhyt esittely, jotta muut käyttävät sinua luottavaisemmin.</p>
+              </div>
+            ) : null}
+
+            <div className="mt-4">
+              <a
+                href="/profile/edit"
+                className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+              >
+                Muokkaa profiilia
+              </a>
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -202,16 +218,20 @@ export default function ProfilePage() {
 
           <div className="mt-6 grid gap-4">
             <div className="rounded-[1.75rem] bg-slate-50 p-5 text-sm text-slate-600">
-              <p className="font-semibold text-slate-900">Nimi</p>
-              <p className="mt-2">{displayName ?? userEmail ?? 'Ei nimeä'}</p>
+              <p className="font-semibold text-slate-900">Sähköposti</p>
+              <p className="mt-2">{userEmail ?? 'Ei sähköpostia'}</p>
             </div>
             <div className="rounded-[1.75rem] bg-slate-50 p-5 text-sm text-slate-600">
               <p className="font-semibold text-slate-900">Sijainti</p>
-              <p className="mt-2">{profileLocation ?? 'Helsinki'}</p>
+              <p className="mt-2">{profileLocation ?? 'Ei sijaintia'}</p>
             </div>
             <div className="rounded-[1.75rem] bg-slate-50 p-5 text-sm text-slate-600">
               <p className="font-semibold text-slate-900">Jäsen vuodesta</p>
               <p className="mt-2">{memberSince ?? '2026'}</p>
+            </div>
+            <div className="rounded-[1.75rem] bg-slate-50 p-5 text-sm text-slate-600 sm:col-span-3">
+              <p className="font-semibold text-slate-900">Esittely</p>
+              <p className="mt-2 text-slate-700">{bio ?? 'Profiilisi ei ole vielä valmis. Täydennä esittelysi muokkaamalla profiilia.'}</p>
             </div>
           </div>
         </section>
