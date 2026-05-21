@@ -23,9 +23,15 @@ type InboxResponse = {
   message: string;
   status: string;
   workflow_status?: string | null;
+
+  sender_deleted_at?: string | null;
+  owner_deleted_at?: string | null;
+
   read_at: string | null;
   created_at: string;
+
   messages?: InboxMessage[];
+
   gigs?:
     | {
         title: string | null;
@@ -54,7 +60,6 @@ export default function InboxPage() {
 
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   function getGigInfo(item: InboxResponse) {
     return Array.isArray(item.gigs) ? item.gigs[0] : item.gigs;
@@ -72,8 +77,6 @@ export default function InboxPage() {
         return 'Suoritettu';
       case 'cancelled':
         return 'Lopetettu';
-      case 'archived':
-        return 'Arkistoitu';
       default:
         return 'Keskustelu';
     }
@@ -81,7 +84,6 @@ export default function InboxPage() {
 
   const loadInbox = async () => {
     setLoading(true);
-    setError(null);
 
     const { data: sessionData } = await supabase.auth.getSession();
 
@@ -95,15 +97,7 @@ export default function InboxPage() {
     const responsesResult = await supabase
       .from('gig_responses')
       .select(`
-        id,
-        gig_id,
-        sender_id,
-        owner_id,
-        message,
-        status,
-        workflow_status,
-        read_at,
-        created_at,
+        *,
         gigs (
           title,
           category,
@@ -114,15 +108,27 @@ export default function InboxPage() {
       .or(`sender_id.eq.${userId},owner_id.eq.${userId}`)
       .order('created_at', { ascending: false });
 
-    if (responsesResult.error) {
-      console.error('Inbox fetch error:', responsesResult.error);
-      setError('Yhteydenottojen lataus epäonnistui.');
-      setLoading(false);
-      return;
-    }
-
     const responseData = (responsesResult.data as InboxResponse[]) ?? [];
-    const responseIds = responseData.map((item) => item.id);
+
+    const visibleResponses = responseData.filter((item) => {
+      if (
+        item.sender_id === userId &&
+        item.sender_deleted_at
+      ) {
+        return false;
+      }
+
+      if (
+        item.owner_id === userId &&
+        item.owner_deleted_at
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const responseIds = visibleResponses.map((item) => item.id);
 
     const messagesByResponse: Record<string, InboxMessage[]> = {};
 
@@ -133,19 +139,18 @@ export default function InboxPage() {
         .in('response_id', responseIds)
         .order('created_at', { ascending: true });
 
-      if (!messagesResult.error) {
-        for (const msg of (messagesResult.data as InboxMessage[]) ?? []) {
-          if (!messagesByResponse[msg.response_id]) {
-            messagesByResponse[msg.response_id] = [];
-          }
-
-          messagesByResponse[msg.response_id].push(msg);
+      for (const msg of (messagesResult.data as InboxMessage[]) ?? []) {
+        if (!messagesByResponse[msg.response_id]) {
+          messagesByResponse[msg.response_id] = [];
         }
+
+        messagesByResponse[msg.response_id].push(msg);
       }
     }
 
-    const mapped = responseData.map((item) => {
+    const mapped = visibleResponses.map((item) => {
       const messages = messagesByResponse[item.id] ?? [];
+
       const latestReply = messages[messages.length - 1];
 
       const latestMessage = latestReply?.message ?? item.message;
@@ -181,19 +186,8 @@ export default function InboxPage() {
   if (loading) {
     return (
       <PageContainer>
-        <div className="rounded-[2rem] bg-white/90 p-8 text-center text-slate-500 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200">
+        <div className="rounded-[2rem] bg-white/90 p-8 text-center">
           Postilaatikkoa ladataan...
-        </div>
-      </PageContainer>
-    );
-  }
-
-  if (error) {
-    return (
-      <PageContainer>
-        <div className="rounded-[2rem] bg-white/90 p-8 text-center shadow-lg shadow-slate-200/60 ring-1 ring-slate-200">
-          <p className="text-lg font-semibold text-slate-900">Postilaatikkoa ei voitu ladata</p>
-          <p className="mt-2 text-sm text-slate-600">{error}</p>
         </div>
       </PageContainer>
     );
@@ -201,101 +195,54 @@ export default function InboxPage() {
 
   return (
     <PageContainer>
-      <div className="space-y-8">
-        <section className="rounded-[2rem] bg-white/90 p-6 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 sm:p-8">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
-            Postilaatikko
-          </p>
+      <div className="space-y-4">
+        {conversations.map((item) => {
+          const gig = getGigInfo(item);
 
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-            Keskustelut
-          </h1>
+          return (
+            <Link
+              key={item.id}
+              href={`/inbox/${item.id}`}
+              className={`block rounded-[2rem] border p-6 shadow-sm ${
+                item.unread
+                  ? 'border-orange-200 bg-orange-50'
+                  : 'border-slate-200 bg-white'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    {item.unread ? (
+                      <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
+                    ) : null}
 
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-            Kaikki keskustelut näkyvät yhdessä listassa. Uusimmat ja lukemattomat nousevat esiin.
-          </p>
-        </section>
-
-        <section className="space-y-4">
-          {conversations.length > 0 ? (
-            conversations.map((item) => {
-              const gig = getGigInfo(item);
-
-              return (
-                <Link
-                  key={item.id}
-                  href={`/inbox/${item.id}`}
-                  className={`block rounded-[2rem] border p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-                    item.unread
-                      ? 'border-orange-200 bg-orange-50/80 ring-1 ring-orange-100'
-                      : 'border-slate-200 bg-white/90'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        {item.unread ? (
-                          <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
-                        ) : null}
-
-                        <h2
-                          className={`text-lg text-slate-900 ${
-                            item.unread ? 'font-bold' : 'font-semibold'
-                          }`}
-                        >
-                          {gig?.title ?? 'Ilmoitus'}
-                        </h2>
-                      </div>
-
-                      <p className="mt-1 text-sm text-slate-500">
-                        {gig?.category ?? 'Kategoria'} · {gig?.location ?? 'Sijainti'}
-                      </p>
-
-                      <p
-                        className={`mt-4 line-clamp-2 text-sm leading-7 ${
-                          item.unread ? 'font-semibold text-slate-900' : 'text-slate-700'
-                        }`}
-                      >
-                        {item.latestSenderId === item.sender_id ? 'Aloittaja: ' : 'Julkaisija: '}
-                        {item.latestMessage}
-                      </p>
-                    </div>
-
-                    <div className="flex shrink-0 flex-col items-end gap-3">
-                      {item.unread ? (
-                        <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
-                          Uusi
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                          {getStatusLabel(item.workflow_status)}
-                        </span>
-                      )}
-
-                      <p className="text-xs text-slate-500">
-                        {new Date(item.latestAt).toLocaleDateString('fi-FI')}
-                      </p>
-                    </div>
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      {gig?.title ?? 'Ilmoitus'}
+                    </h2>
                   </div>
-                </Link>
-              );
-            })
-          ) : (
-            <div className="rounded-[2rem] border border-slate-200 bg-white/90 p-8 text-center shadow-sm">
-              <p className="text-lg font-semibold text-slate-900">Ei keskusteluja</p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
-                Keskustelut näkyvät täällä, kun otat yhteyttä ilmoituksiin tai joku vastaa sinun ilmoitukseesi.
-              </p>
 
-              <Link
-                href="/browse"
-                className="mt-6 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
-              >
-                Selaa ilmoituksia
-              </Link>
-            </div>
-          )}
-        </section>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {gig?.category} · {gig?.location}
+                  </p>
+
+                  <p className="mt-4 text-sm text-slate-700">
+                    {item.latestMessage}
+                  </p>
+                </div>
+
+                <div className="flex flex-col items-end gap-3">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    {getStatusLabel(item.workflow_status)}
+                  </span>
+
+                  <p className="text-xs text-slate-500">
+                    {new Date(item.latestAt).toLocaleDateString('fi-FI')}
+                  </p>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </PageContainer>
   );
