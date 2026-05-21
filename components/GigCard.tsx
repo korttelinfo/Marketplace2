@@ -1,18 +1,29 @@
 import Link from 'next/link';
 import type { BrowseGig } from '../lib/mockGigs';
+import { getUrgencyEmoji, getUrgencyLabel, type Urgency } from '../lib/helpCategories';
 
 type GigCardProps = {
   gig: BrowseGig;
 };
 
 export default function GigCard({ gig }: GigCardProps) {
+  // Check if date_time is an urgency value
+  const urgencyOptions = ['Tänään', 'Tällä viikolla', 'Ei kiirettä'];
+  const isUrgency = urgencyOptions.includes(gig.date_time);
+  const urgency = isUrgency ? (gig.date_time as Urgency) : null;
+
   return (
     <article className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
       <div className="flex items-center justify-between gap-3">
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-600">
           {gig.status}
         </span>
-        <span className="text-sm text-slate-500">{gig.date_time}</span>
+        {urgency && (
+          <span className="flex items-center gap-2 text-sm text-slate-600">
+            <span className="text-base">{getUrgencyEmoji(urgency)}</span>
+            {getUrgencyLabel(urgency)}
+          </span>
+        )}
       </div>
       <h2 className="mt-5 text-xl font-semibold text-slate-900">{gig.title}</h2>
       <p className="mt-3 text-sm leading-6 text-slate-600">{gig.description}</p>
