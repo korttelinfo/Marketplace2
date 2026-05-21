@@ -5,10 +5,12 @@ import Link from 'next/link';
 import PageContainer from '../../components/PageContainer';
 import GigCard from '../../components/GigCard';
 import { browseCategories, type BrowseGig } from '../../lib/mockGigs';
+import { cities } from '../../lib/locations';
 import { supabase } from '../../lib/supabase';
 
 export default function BrowsePage() {
   const [query, setQuery] = useState('');
+  const [selectedCity, setSelectedCity] = useState('Kaikki');
   const [activeCategory, setActiveCategory] = useState('Kaikki');
   const [gigs, setGigs] = useState<BrowseGig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,12 +52,14 @@ export default function BrowsePage() {
   const filteredGigs = useMemo(() => {
     return gigs.filter((gig) => {
       const matchesCategory = activeCategory === 'Kaikki' || gig.category === activeCategory;
+      const matchesCity =
+        selectedCity === 'Kaikki' || gig.location?.toLowerCase().includes(selectedCity.toLowerCase());
       const matchesQuery = query
         ? [gig.title, gig.description, gig.category, gig.location].some((field) =>
             field.toLowerCase().includes(query.toLowerCase()),
           )
         : true;
-      return matchesCategory && matchesQuery;
+      return matchesCategory && matchesCity && matchesQuery;
     });
   }, [activeCategory, gigs, query]);
 
@@ -82,6 +86,21 @@ export default function BrowsePage() {
               placeholder="Hae keikkoja esimerkiksi siivous, koira, pihatyö..."
               className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
             />
+          </label>
+          <label className="relative block w-full sm:w-64">
+            <span className="sr-only">Valitse kaupunki</span>
+            <select
+              value={selectedCity}
+              onChange={(event) => setSelectedCity(event.target.value)}
+              className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            >
+              <option value="Kaikki">Kaikki kaupungit</option>
+              {cities.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
+            </select>
           </label>
           <p className="text-sm text-slate-500 sm:text-right">
             {loading ? 'Ladataan...' : `${filteredGigs.length} keikkaa`}

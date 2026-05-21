@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import PageContainer from '../../components/PageContainer';
 import { formCategories } from '../../lib/mockGigs';
 import { supabase } from '../../lib/supabase';
+import { cities, formatLocation, getNeighborhoods, parseLocation, type City } from '../../lib/locations';
 
 export default function CreatePage() {
   const router = useRouter();
@@ -12,7 +13,9 @@ export default function CreatePage() {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<string>(formCategories[0]);
   const [budget, setBudget] = useState('');
-  const [location, setLocation] = useState('');
+  const [city, setCity] = useState<City>('Helsinki');
+  const [neighborhood, setNeighborhood] = useState<string>(getNeighborhoods('Helsinki')[0]);
+  const [location, setLocation] = useState<string>(formatLocation('Helsinki', getNeighborhoods('Helsinki')[0]));
   const [dateTime, setDateTime] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -29,7 +32,22 @@ export default function CreatePage() {
         return;
       }
 
-      setUserId(data.session.user.id);
+      const userId = data.session.user.id;
+      setUserId(userId);
+
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('location')
+        .eq('id', userId)
+        .single();
+
+      if (profileData?.location) {
+        const parsed = parseLocation(profileData.location);
+        setCity(parsed.city);
+        setNeighborhood(parsed.neighborhood);
+        setLocation(formatLocation(parsed.city, parsed.neighborhood));
+      }
+
       setCheckingAuth(false);
     };
 
@@ -158,14 +176,43 @@ export default function CreatePage() {
 
           <div className="grid gap-6 sm:grid-cols-2">
             <label className="block">
-              <span className="mb-2 block text-sm font-semibold text-slate-700">Noin sijainti</span>
-              <input
-                type="text"
-                value={location}
-                onChange={(event) => setLocation(event.target.value)}
-                placeholder="Esim. Punavuori, Helsinki"
-                className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-              />
+              <span className="mb-2 block text-sm font-semibold text-slate-700">Kaupunki</span>
+              <select
+                value={city}
+                onChange={(event) => {
+                  const nextCity = event.target.value as City;
+                  const nextNeighborhood = getNeighborhoods(nextCity)[0] ?? '';
+                  setCity(nextCity);
+                  setNeighborhood(nextNeighborhood);
+                  setLocation(formatLocation(nextCity, nextNeighborhood));
+                }}
+                className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              >
+                {cities.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold text-slate-700">Alue</span>
+              <select
+                value={neighborhood}
+                onChange={(event) => {
+                  const nextNeighborhood = event.target.value;
+                  setNeighborhood(nextNeighborhood);
+                  setLocation(formatLocation(city, nextNeighborhood));
+                }}
+                className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              >
+                {getNeighborhoods(city).map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 

@@ -4,11 +4,14 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PageContainer from '../../../components/PageContainer';
 import { supabase } from '../../../lib/supabase';
+import { cities, formatLocation, getNeighborhoods, parseLocation, type City } from '../../../lib/locations';
 
 export default function ProfileEditPage() {
   const router = useRouter();
   const [displayName, setDisplayName] = useState('');
-  const [location, setLocation] = useState('');
+  const [city, setCity] = useState<City>('Helsinki');
+  const [neighborhood, setNeighborhood] = useState<string>(getNeighborhoods('Helsinki')[0]);
+  const [location, setLocation] = useState<string>(formatLocation('Helsinki', getNeighborhoods('Helsinki')[0]));
   const [bio, setBio] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -37,8 +40,11 @@ export default function ProfileEditPage() {
       }
 
       const profile = data as { display_name: string | null; location: string | null; bio: string | null } | null;
+      const parsed = parseLocation(profile?.location ?? '');
+      setCity(parsed.city);
+      setNeighborhood(parsed.neighborhood);
+      setLocation(formatLocation(parsed.city, parsed.neighborhood));
       setDisplayName(profile?.display_name ?? '');
-      setLocation(profile?.location ?? '');
       setBio(profile?.bio ?? '');
       setLoading(false);
     };
@@ -132,16 +138,47 @@ export default function ProfileEditPage() {
             />
           </label>
 
-          <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-slate-700">Sijainti</span>
-            <input
-              type="text"
-              value={location}
-              onChange={(event) => setLocation(event.target.value)}
-              placeholder="Esim. Helsinki"
-              className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-            />
-          </label>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold text-slate-700">Kaupunki</span>
+              <select
+                value={city}
+                onChange={(event) => {
+                  const nextCity = event.target.value as City;
+                  const nextNeighborhood = getNeighborhoods(nextCity)[0] ?? '';
+                  setCity(nextCity);
+                  setNeighborhood(nextNeighborhood);
+                  setLocation(formatLocation(nextCity, nextNeighborhood));
+                }}
+                className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              >
+                {cities.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold text-slate-700">Alue</span>
+              <select
+                value={neighborhood}
+                onChange={(event) => {
+                  const nextNeighborhood = event.target.value;
+                  setNeighborhood(nextNeighborhood);
+                  setLocation(formatLocation(city, nextNeighborhood));
+                }}
+                className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              >
+                {getNeighborhoods(city).map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
           <label className="block">
             <span className="mb-2 block text-sm font-semibold text-slate-700">Lyhyt esittely</span>
