@@ -18,12 +18,14 @@ type Profile = {
 
 export default function ProfilePage() {
   const router = useRouter();
+
   const [gigs, setGigs] = useState<BrowseGig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [profileLocation, setProfileLocation] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export default function ProfilePage() {
   const profileIncomplete = !displayName || !profileLocation || !bio;
 
   useEffect(() => {
-    const loadUserGigs = async () => {
+    const loadProfilePage = async () => {
       const { data: sessionData } = await supabase.auth.getSession();
 
       if (!sessionData.session) {
@@ -42,25 +44,24 @@ export default function ProfilePage() {
       }
 
       const userId = sessionData.session.user.id;
-      const email = sessionData.session.user.email ?? null;
-      setUserEmail(email);
+      setUserEmail(sessionData.session.user.email ?? null);
 
       const createdAt = sessionData.session.user.created_at;
-      if (createdAt) setMemberSince(String(new Date(createdAt).getFullYear()));
-      const result = await supabase
+      if (createdAt) {
+        setMemberSince(String(new Date(createdAt).getFullYear()));
+      }
+
+      const gigsResult = await supabase
         .from('gigs')
-        .select('id,title,category,budget,location,date_time,description,status')
+        .select('id,title,category,budget,location,date_time,description,status,listing_type')
         .eq('user_id', userId)
         .order('date_time', { ascending: false });
 
-      const data = result.data as BrowseGig[] | null;
-      const error = result.error;
-
-      if (error) {
-        console.error('Supabase profile fetch error:', error);
-        setError(error.message);
+      if (gigsResult.error) {
+        console.error('Supabase profile gigs fetch error:', gigsResult.error);
+        setError(gigsResult.error.message);
       } else {
-        setGigs(data ?? []);
+        setGigs((gigsResult.data as BrowseGig[]) ?? []);
       }
 
       const profileResult = await supabase
@@ -70,10 +71,9 @@ export default function ProfilePage() {
         .single();
 
       const profileData = profileResult.data as Profile | null;
-      const profileError = profileResult.error;
 
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.error('Supabase profile fetch error:', profileError);
+      if (profileResult.error && profileResult.error.code !== 'PGRST116') {
+        console.error('Supabase profile fetch error:', profileResult.error);
         setError('Profiilin latauksessa tapahtui virhe. Yritä uudelleen.');
       }
 
@@ -100,6 +100,7 @@ export default function ProfilePage() {
         setDisplayName(profileData.display_name);
         setProfileLocation(profileData.location);
         setBio(profileData.bio);
+
         if (profileData.created_at) {
           setMemberSince(String(new Date(profileData.created_at).getFullYear()));
         }
@@ -108,22 +109,22 @@ export default function ProfilePage() {
       setLoading(false);
     };
 
-    loadUserGigs();
+    loadProfilePage();
   }, [router]);
 
   const handleDelete = (id: string) => {
-    // open confirmation modal
     setPendingDeleteId(id);
     setConfirmOpen(true);
   };
 
   const performDelete = async (id: string) => {
     setDeletingId(id);
-    const { error } = await supabase.from('gigs').delete().eq('id', id);
 
-    if (error) {
-      console.error('Supabase delete error:', error);
-      setError('Keikan poistossa tapahtui virhe. Yritä uudelleen.');
+    const { error: deleteError } = await supabase.from('gigs').delete().eq('id', id);
+
+    if (deleteError) {
+      console.error('Supabase delete error:', deleteError);
+      setError('Ilmoituksen poistossa tapahtui virhe. Yritä uudelleen.');
       setDeletingId(null);
       return;
     }
@@ -134,6 +135,7 @@ export default function ProfilePage() {
 
   const confirmDelete = async () => {
     if (!pendingDeleteId) return;
+
     setConfirmOpen(false);
     await performDelete(pendingDeleteId);
     setPendingDeleteId(null);
@@ -142,7 +144,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <PageContainer>
-        <div className="rounded-[2rem] bg-white/90 p-8 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 text-center text-slate-500">
+        <div className="rounded-[2rem] bg-white/90 p-8 text-center text-slate-500 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200">
           Profiilia ladataan...
         </div>
       </PageContainer>
@@ -152,7 +154,7 @@ export default function ProfilePage() {
   if (error) {
     return (
       <PageContainer>
-        <div className="rounded-[2rem] bg-white/90 p-8 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 text-center">
+        <div className="rounded-[2rem] bg-white/90 p-8 text-center shadow-lg shadow-slate-200/60 ring-1 ring-slate-200">
           <p className="text-lg font-semibold text-slate-900">Tietoja ei voitu ladata</p>
           <p className="mt-2 text-sm leading-7 text-slate-600">{error}</p>
         </div>
@@ -162,131 +164,182 @@ export default function ProfilePage() {
 
   const totalGigs = gigs.length;
   const openGigs = gigs.filter((gig) => gig.status?.toLowerCase() === 'vapaa').length;
-  const newestGigDate = gigs[0]?.date_time ?? 'Ei keikkoja';
-  const latestGigs = gigs.slice(0, 4);
+  const latestGigs = gigs.slice(0, 6);
 
   return (
     <PageContainer>
-      <div className="grid gap-8 lg:grid-cols-[1.25fr_0.9fr]">
-        <section className="space-y-6 rounded-[2rem] bg-white/90 p-6 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 sm:p-8">
-          <div className="space-y-4">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Oma profiili</p>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">{displayName ?? userEmail ?? 'Profiili'}</h1>
-            <p className="max-w-2xl text-sm leading-7 text-slate-600">{userEmail}</p>
-            <p className="max-w-2xl text-sm leading-7 text-slate-600">
-              {profileLocation ?? 'Helsinki'} · Jäsen vuodesta {memberSince ?? '2026'}
-            </p>
-            {profileIncomplete ? (
-              <div className="mt-4 rounded-[1.75rem] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                <p className="font-semibold">Täydennä profiilisi tiedot.</p>
-                <p className="mt-2 text-slate-700">Lisää nimi, sijainti ja lyhyt esittely, jotta muut käyttävät sinua luottavaisemmin.</p>
-              </div>
-            ) : null}
+      <div className="space-y-8">
+        <section className="rounded-[2rem] bg-white/90 p-6 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 sm:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-4">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Oma profiili
+              </p>
 
-            <div className="mt-4">
+              <div>
+                <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+                  {displayName ?? 'Täydennä profiilisi'}
+                </h1>
+                <p className="mt-3 text-sm leading-7 text-slate-600">
+                  {profileLocation ?? 'Sijainti puuttuu'} · Jäsen vuodesta {memberSince ?? '2026'}
+                </p>
+              </div>
+
+              <p className="max-w-2xl text-sm leading-7 text-slate-700">
+                {bio ?? 'Lisää lyhyt esittely, jotta muut alueen ihmiset saavat sinusta luotettavamman ensivaikutelman.'}
+              </p>
+
+              {profileIncomplete ? (
+                <div className="rounded-[1.75rem] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  <p className="font-semibold">Täydennä profiilisi tiedot.</p>
+                  <p className="mt-2 text-amber-800">
+                    Nimi, sijainti ja lyhyt esittely tekevät yhteydenotoista luontevampia.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
+              <Link
+                href="/create"
+                className="inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+              >
+                Luo uusi ilmoitus
+              </Link>
+
               <Link
                 href="/profile/edit"
-                className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
               >
                 Muokkaa profiilia
               </Link>
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <article className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Yhteensä keikkoja</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Ilmoituksia
+              </p>
               <p className="mt-3 text-3xl font-semibold text-slate-900">{totalGigs}</p>
             </article>
+
             <article className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Avoimia keikkoja</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Avoimia ilmoituksia
+              </p>
               <p className="mt-3 text-3xl font-semibold text-slate-900">{openGigs}</p>
             </article>
-            <article className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5">
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Uusin keikka</p>
-              <p className="mt-3 text-3xl font-semibold text-slate-900">{newestGigDate}</p>
+
+            <article className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 sm:col-span-2 lg:col-span-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Tilin sähköposti
+              </p>
+              <p className="mt-3 break-all text-sm font-semibold text-slate-900">
+                {userEmail ?? 'Ei sähköpostia'}
+              </p>
             </article>
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-6 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 sm:p-8">
-          <div className="space-y-3">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Omat tilastot</p>
-            <p className="text-sm leading-7 text-slate-600">
-              Näet uusimmat keikat ja avoimet työpyynnöt suorasta tietokannasta.
-            </p>
+        <section className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Omat ilmoitukset
+              </p>
+              <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
+                Hallitse julkaisemiasi ilmoituksia
+              </h2>
+            </div>
+
+            <Link
+              href="/create"
+              className="inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+            >
+              Luo ilmoitus
+            </Link>
           </div>
 
-          <div className="mt-6 grid gap-4">
-            <div className="rounded-[1.75rem] bg-slate-50 p-5 text-sm text-slate-600">
-              <p className="font-semibold text-slate-900">Sähköposti</p>
-              <p className="mt-2">{userEmail ?? 'Ei sähköpostia'}</p>
+          {latestGigs.length > 0 ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {latestGigs.map((gig) => (
+                <div key={gig.id} className="space-y-3">
+                  <GigCard gig={gig} />
+
+                  <div className="flex flex-wrap gap-3">
+                    <Link
+                      href={`/profile/edit/${gig.id}`}
+                      className="inline-flex flex-1 items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                    >
+                      Muokkaa
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(gig.id)}
+                      disabled={deletingId === gig.id}
+                      className="inline-flex flex-1 items-center justify-center rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
+                    >
+                      {deletingId === gig.id ? 'Poistetaan...' : 'Poista'}
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="rounded-[1.75rem] bg-slate-50 p-5 text-sm text-slate-600">
-              <p className="font-semibold text-slate-900">Sijainti</p>
-              <p className="mt-2">{profileLocation ?? 'Ei sijaintia'}</p>
+          ) : (
+            <div className="rounded-[2rem] border border-slate-200 bg-white/90 p-8 text-center shadow-sm">
+              <p className="text-lg font-semibold text-slate-900">Ei vielä ilmoituksia</p>
+              <p className="mt-2 text-sm leading-7 text-slate-600">
+                Luo ensimmäinen ilmoitus, jos tarvitset apua tai haluat tarjoutua auttamaan lähialueella.
+              </p>
+              <Link
+                href="/create"
+                className="mt-6 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
+              >
+                Luo ilmoitus
+              </Link>
             </div>
-            <div className="rounded-[1.75rem] bg-slate-50 p-5 text-sm text-slate-600">
-              <p className="font-semibold text-slate-900">Jäsen vuodesta</p>
-              <p className="mt-2">{memberSince ?? '2026'}</p>
-            </div>
-            <div className="rounded-[1.75rem] bg-slate-50 p-5 text-sm text-slate-600 sm:col-span-3">
-              <p className="font-semibold text-slate-900">Esittely</p>
-              <p className="mt-2 text-slate-700">{bio ?? 'Profiilisi ei ole vielä valmis. Täydennä esittelysi muokkaamalla profiilia.'}</p>
-            </div>
-          </div>
+          )}
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-2">
+          <article className="rounded-[2rem] border border-slate-200 bg-white/90 p-6 shadow-sm sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
+              Saapuneet yhteydenotot
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
+              Tulossa seuraavaksi
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-slate-600">
+              Kun joku vastaa ilmoitukseesi, yhteydenotto näkyy täällä. Voit myöhemmin hyväksyä, hylätä tai arkistoida yhteydenoton.
+            </p>
+          </article>
+
+          <article className="rounded-[2rem] border border-slate-200 bg-white/90 p-6 shadow-sm sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
+              Lähetetyt yhteydenotot
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
+              Omat yhteydenottosi
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-slate-600">
+              Näet täällä myöhemmin ilmoitukset, joihin olet tarjoutunut auttamaan tai joista olet pyytänyt apua.
+            </p>
+          </article>
         </section>
       </div>
 
-      <section className="mt-8 space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">Viimeisimmät keikat</p>
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Julkaistu viimeksi</h2>
-          </div>
-          <p className="text-sm text-slate-500">Näytetään {latestGigs.length} uusinta keikkaa</p>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {latestGigs.length > 0 ? (
-            latestGigs.map((gig) => (
-              <div key={gig.id} className="space-y-3">
-                <GigCard gig={gig} />
-                <div className="flex flex-wrap gap-3">
-                  <a
-                    href={`/profile/edit/${gig.id}`}
-                    className="inline-flex flex-1 items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
-                  >
-                    Muokkaa
-                  </a>
-                  <button
-                    type="button"
-                      onClick={() => handleDelete(gig.id)}
-                    disabled={deletingId === gig.id}
-                    className="inline-flex flex-1 items-center justify-center rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
-                  >
-                    {deletingId === gig.id ? 'Poistetaan...' : 'Poista'}
-                  </button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
-              Sinulla ei ole vielä keikkoja. Luo ensimmäinen keikka profiilista.
-            </div>
-          )}
-        </div>
-      </section>
       <ConfirmModal
         open={confirmOpen}
-        title="Poista keikka"
+        title="Poista ilmoitus"
         onConfirm={confirmDelete}
         onCancel={() => {
           setConfirmOpen(false);
           setPendingDeleteId(null);
         }}
       >
-        Haluatko varmasti poistaa tämän keikan? Toimintoa ei voi peruuttaa.
+        Haluatko varmasti poistaa tämän ilmoituksen? Toimintoa ei voi peruuttaa.
       </ConfirmModal>
     </PageContainer>
   );
