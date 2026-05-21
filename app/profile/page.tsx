@@ -32,6 +32,7 @@ export default function ProfilePage() {
   const router = useRouter();
 
   const [gigs, setGigs] = useState<BrowseGig[]>([]);
+  const [workflowGigs, setWorkflowGigs] = useState<BrowseGig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +76,37 @@ export default function ProfilePage() {
         setError(gigsResult.error.message);
       } else {
         setGigs((gigsResult.data as BrowseGig[]) ?? []);
+      }
+
+      const workflowResult = await supabase
+        .from('gig_responses')
+        .select(`
+          workflow_status,
+          sender_id,
+          owner_id,
+          gigs (
+            id,
+            title,
+            category,
+            budget,
+            location,
+            date_time,
+            description,
+            status,
+            listing_type
+          )
+        `)
+        .or(`sender_id.eq.${userId},owner_id.eq.${userId}`);
+
+      if (workflowResult.error) {
+        console.error('Workflow fetch error:', workflowResult.error);
+      } else {
+        const workflowItems =
+          workflowResult.data
+            ?.map((item: any) => item.gigs)
+            .filter(Boolean) ?? [];
+
+        setWorkflowGigs(workflowItems as BrowseGig[]);
       }
 
       const profileResult = await supabase
@@ -180,51 +212,54 @@ export default function ProfilePage() {
   const latestGigs = gigs.slice(0, 6);
 
   const initials =
-  displayName
-    ?.split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase() || 'KT';
-    
+    displayName
+      ?.split(' ')
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'KT';
+
   const sortNewestFirst = (items: BrowseGig[]) =>
-  [...items].sort((a, b) => {
-    const aTime = a.date_time ? new Date(a.date_time).getTime() : 0;
-    const bTime = b.date_time ? new Date(b.date_time).getTime() : 0;
-    return bTime - aTime;
-  });
+    [...items].sort((a, b) => {
+      const aTime = a.date_time ? new Date(a.date_time).getTime() : 0;
+      const bTime = b.date_time ? new Date(b.date_time).getTime() : 0;
+      return bTime - aTime;
+    });
 
-const activeGigs = sortNewestFirst(
-  gigs.filter((gig) => {
-    const status = gig.status?.toLowerCase() ?? '';
-    return status === 'vapaa' || status === 'aktiivinen' || status === 'open';
-  })
-).slice(0, 2);
+  const activeGigs = sortNewestFirst(
+    gigs.filter((gig) => {
+      const status = gig.status?.toLowerCase() ?? '';
+      return status === 'vapaa' || status === 'aktiivinen' || status === 'open';
+    })
+  ).slice(0, 2);
 
-const ongoingGigs = sortNewestFirst(
-  gigs.filter((gig) => {
-    const status = gig.status?.toLowerCase() ?? '';
-    return (
-      status === 'sovittu' ||
-      status === 'hyväksytty' ||
-      status === 'meneillään' ||
-      status === 'accepted' ||
-      status === 'in_progress'
-    );
-  })
-).slice(0, 2);
+  const ongoingGigs = sortNewestFirst(
+    workflowGigs.filter((gig) => {
+      const status = gig.status?.toLowerCase() ?? '';
+      return (
+        status === 'active' ||
+        status === 'pending_agreement' ||
+        status === 'meneillään' ||
+        status === 'sovittu' ||
+        status === 'hyväksytty' ||
+        status === 'accepted' ||
+        status === 'in_progress'
+      );
+    })
+  ).slice(0, 2);
 
-const completedGigs = sortNewestFirst(
-  gigs.filter((gig) => {
-    const status = gig.status?.toLowerCase() ?? '';
-    return (
-      status === 'valmis' ||
-      status === 'suoritettu' ||
-      status === 'completed' ||
-      status === 'done'
-    );
-  })
-).slice(0, 2);
+  const completedGigs = sortNewestFirst(
+    workflowGigs.filter((gig) => {
+      const status = gig.status?.toLowerCase() ?? '';
+      return (
+        status === 'completed' ||
+        status === 'valmis' ||
+        status === 'suoritettu' ||
+        status === 'done'
+      );
+    })
+  ).slice(0, 2);
+
   return (
     <PageContainer>
       <div className="space-y-8">
@@ -315,68 +350,68 @@ const completedGigs = sortNewestFirst(
         </section>
 
         <section className="space-y-4">
-  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-    <div>
-      <h2 className="text-2xl font-bold tracking-tight text-slate-950">
-        Omat ilmoitukset
-      </h2>
-      <p className="mt-1 text-sm text-slate-500">
-        Tuoreimmat ilmoitukset ja työnkulut yhdessä näkymässä.
-      </p>
-    </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+                Omat ilmoitukset
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Tuoreimmat ilmoitukset ja työnkulut yhdessä näkymässä.
+              </p>
+            </div>
 
-    <Link
-      href="/create"
-      className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-    >
-      <Plus size={17} />
-      Luo ilmoitus
-    </Link>
-  </div>
+            <Link
+              href="/create"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              <Plus size={17} />
+              Luo ilmoitus
+            </Link>
+          </div>
 
-  <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-    <div className="grid divide-y divide-slate-200 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
-      <ListingColumn
-        title="Aktiiviset ilmoitukset"
-        count={activeGigs.length}
-        gigs={activeGigs}
-        emptyText="Ei aktiivisia ilmoituksia"
-        tone="green"
-        deletingId={deletingId}
-        onDelete={handleDelete}
-      />
+          <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+            <div className="grid divide-y divide-slate-200 lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+              <ListingColumn
+                title="Aktiiviset ilmoitukset"
+                count={activeGigs.length}
+                gigs={activeGigs}
+                emptyText="Ei aktiivisia ilmoituksia"
+                tone="green"
+                deletingId={deletingId}
+                onDelete={handleDelete}
+              />
 
-      <ListingColumn
-        title="Meneillään olevat"
-        count={ongoingGigs.length}
-        gigs={ongoingGigs}
-        emptyText="Ei meneillään olevia"
-        tone="blue"
-        deletingId={deletingId}
-        onDelete={handleDelete}
-      />
+              <ListingColumn
+                title="Meneillään olevat"
+                count={ongoingGigs.length}
+                gigs={ongoingGigs}
+                emptyText="Ei meneillään olevia"
+                tone="blue"
+                deletingId={deletingId}
+                onDelete={handleDelete}
+              />
 
-      <ListingColumn
-        title="Valmiit / hyväksytyt"
-        count={completedGigs.length}
-        gigs={completedGigs}
-        emptyText="Ei valmiita ilmoituksia"
-        tone="purple"
-        deletingId={deletingId}
-        onDelete={handleDelete}
-      />
-    </div>
+              <ListingColumn
+                title="Valmiit / suoritetut"
+                count={completedGigs.length}
+                gigs={completedGigs}
+                emptyText="Ei valmiita ilmoituksia"
+                tone="purple"
+                deletingId={deletingId}
+                onDelete={handleDelete}
+              />
+            </div>
 
-    <div className="border-t border-slate-100 px-5 py-4 text-center">
-      <Link
-        href="/profile/listings"
-        className="text-sm font-semibold text-slate-700 transition hover:text-slate-950"
-      >
-        Näytä kaikki ilmoitukset →
-      </Link>
-    </div>
-  </div>
-</section>
+            <div className="border-t border-slate-100 px-5 py-4 text-center">
+              <Link
+                href="/profile/listings"
+                className="text-sm font-semibold text-slate-700 transition hover:text-slate-950"
+              >
+                Näytä kaikki ilmoitukset →
+              </Link>
+            </div>
+          </div>
+        </section>
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -521,6 +556,7 @@ function ReviewRow({
     </article>
   );
 }
+
 function ListingColumn({
   title,
   count,
@@ -631,6 +667,7 @@ function ListingColumn({
     </div>
   );
 }
+
 function SummaryRow({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="flex items-center justify-between gap-4">
