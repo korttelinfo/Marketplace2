@@ -92,32 +92,6 @@ export default function InboxThreadPage() {
     }
   }
 
-  const markAsRead = async (
-    responseData: InboxResponse,
-    userId: string,
-    threadMessages: InboxMessage[]
-  ) => {
-    const now = new Date().toISOString();
-
-    if (responseData.sender_id !== userId && !responseData.read_at) {
-      await supabase
-        .from('gig_responses')
-        .update({ read_at: now })
-        .eq('id', responseData.id);
-    }
-
-    const unreadMessageIds = threadMessages
-      .filter((msg) => msg.sender_id !== userId && !msg.read_at)
-      .map((msg) => msg.id);
-
-    if (unreadMessageIds.length > 0) {
-      await supabase
-        .from('gig_response_messages')
-        .update({ read_at: now })
-        .in('id', unreadMessageIds);
-    }
-  };
-
   const loadThread = async () => {
     setLoading(true);
     setError(null);
@@ -193,25 +167,8 @@ export default function InboxThreadPage() {
       return;
     }
 
-    const threadMessages = (messagesResult.data as InboxMessage[]) ?? [];
-
-    await markAsRead(responseData, userId, threadMessages);
-
-    setResponse({
-      ...responseData,
-      read_at:
-        responseData.sender_id !== userId
-          ? responseData.read_at ?? new Date().toISOString()
-          : responseData.read_at,
-    });
-
-    setMessages(
-      threadMessages.map((msg) =>
-        msg.sender_id !== userId && !msg.read_at
-          ? { ...msg, read_at: new Date().toISOString() }
-          : msg
-      )
-    );
+    setResponse(responseData);
+    setMessages((messagesResult.data as InboxMessage[]) ?? []);
 
     setLoading(false);
   };
@@ -251,6 +208,22 @@ export default function InboxThreadPage() {
     setSendingReply(false);
   };
 
+  const updateWorkflow = async (updates: Partial<InboxResponse>) => {
+    if (!response) return;
+
+    const { error: updateError } = await supabase
+      .from('gig_responses')
+      .update(updates)
+      .eq('id', response.id);
+
+    if (updateError) {
+      console.error(updateError);
+      return;
+    }
+
+    await loadThread();
+  };
+
   if (loading) {
     return (
       <PageContainer>
@@ -272,20 +245,21 @@ export default function InboxThreadPage() {
           <p className="mt-2 text-sm text-slate-600">
             {error ?? 'Keskustelua ei löytynyt.'}
           </p>
-
-          <Link
-            href="/inbox"
-            className="mt-6 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
-          >
-            Takaisin postilaatikkoon
-          </Link>
         </div>
       </PageContainer>
     );
   }
 
   const gigInfo = getGigInfo(response);
-  const firstMessageIsOwn = response.sender_id === currentUserId;
+
+  const workflowStatus = response.workflow_status ?? 'pending';
+
+  const isAgreementRequester =
+    response.agreement_requested_by === currentUserId;
+
+  const isCancelled = workflowStatus === 'cancelled';
+
+  const isCompleted = workflowStatus === 'completed';
 
   return (
     <PageContainer>
@@ -313,35 +287,18 @@ export default function InboxThreadPage() {
                 {gigInfo?.location ?? 'Sijainti'}
               </p>
             </div>
-
-            <Link
-              href={`/browse/${response.gig_id}`}
-              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
-            >
-              Avaa ilmoitus
-            </Link>
           </div>
         </section>
 
         <section className="rounded-[2rem] border border-slate-200 bg-white/90 p-4 shadow-sm sm:p-6">
           <div className="space-y-4">
-            <div
-              className={`max-w-[85%] rounded-[1.5rem] p-4 ${
-                firstMessageIsOwn
-                  ? 'ml-auto bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-900'
-              }`}
-            >
+            <div className="max-w-[85%] rounded-[1.5rem] bg-slate-100 p-4 text-slate-900">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-70">
                 Ensimmäinen yhteydenotto
               </p>
 
               <p className="mt-2 text-sm leading-7">
                 {response.message}
-              </p>
-
-              <p className="mt-3 text-xs opacity-70">
-                {new Date(response.created_at).toLocaleDateString('fi-FI')}
               </p>
             </div>
 
@@ -360,10 +317,6 @@ export default function InboxThreadPage() {
                   <p className="text-sm leading-7">
                     {msg.message}
                   </p>
-
-                  <p className="mt-3 text-xs opacity-70">
-                    {new Date(msg.created_at).toLocaleDateString('fi-FI')}
-                  </p>
                 </div>
               );
             })}
@@ -372,46 +325,75 @@ export default function InboxThreadPage() {
           <div className="mt-6 border-t border-slate-200 pt-6">
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
-                {getWorkflowLabel(response.workflow_status)}
+                {getWorkflowLabel(workflowStatus)}
               </span>
 
-              {response.workflow_status === 'pending' ? (
+              {(workflowStatus === 'pending' ||
+                workflowStatus === 'agreement_rejected') ? (
                 <button
                   type="button"
+                  onClick={() =>
+                    updateWorkflow({
+                      workflow_status: 'agreement_requested',
+                      agreement_requested_by: currentUserId,
+                    })
+                  }
                   className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
                 >
                   Merkitse sovituksi
                 </button>
               ) : null}
 
-              {response.workflow_status === 'agreement_requested' ? (
-                <>
-                  <button
-                    type="button"
-                    className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
-                  >
-                    Hyväksy sopimus
-                  </button>
+              {workflowStatus === 'agreement_requested' ? (
+                isAgreementRequester ? (
+                  <span className="rounded-full bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 ring-1 ring-amber-200">
+                    Odotetaan toisen hyväksyntää
+                  </span>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateWorkflow({
+                          workflow_status: 'active',
+                        })
+                      }
+                      className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                    >
+                      Hyväksy sopimus
+                    </button>
 
-                  <button
-                    type="button"
-                    className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-400"
-                  >
-                    Hylkää
-                  </button>
-                </>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateWorkflow({
+                          workflow_status: 'agreement_rejected',
+                          agreement_requested_by: null,
+                        })
+                      }
+                      className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-400"
+                    >
+                      Hylkää
+                    </button>
+                  </>
+                )
               ) : null}
 
-              {response.workflow_status === 'active' ? (
+              {workflowStatus === 'active' ? (
                 <button
                   type="button"
+                  onClick={() =>
+                    updateWorkflow({
+                      workflow_status: 'completed',
+                    })
+                  }
                   className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
                 >
                   Merkitse suoritetuksi
                 </button>
               ) : null}
 
-              {response.workflow_status === 'completed' ? (
+              {isCompleted ? (
                 <button
                   type="button"
                   className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
@@ -420,10 +402,15 @@ export default function InboxThreadPage() {
                 </button>
               ) : null}
 
-              {response.workflow_status !== 'cancelled' &&
-              response.workflow_status !== 'completed' ? (
+              {!isCancelled && !isCompleted ? (
                 <button
                   type="button"
+                  onClick={() =>
+                    updateWorkflow({
+                      workflow_status: 'cancelled',
+                      cancelled_at: new Date().toISOString(),
+                    })
+                  }
                   className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
                 >
                   Lopeta keskustelu
@@ -431,7 +418,7 @@ export default function InboxThreadPage() {
               ) : null}
             </div>
 
-            {response.workflow_status === 'cancelled' ? (
+            {isCancelled ? (
               <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4">
                 <p className="text-sm font-semibold text-red-700">
                   Tämä keskustelu on lopetettu.
@@ -453,10 +440,10 @@ export default function InboxThreadPage() {
               <textarea
                 value={replyMessage}
                 onChange={(event) => setReplyMessage(event.target.value)}
-                disabled={response.workflow_status === 'cancelled'}
+                disabled={isCancelled}
                 rows={4}
                 placeholder={
-                  response.workflow_status === 'cancelled'
+                  isCancelled
                     ? 'Keskustelu on lopetettu'
                     : 'Kirjoita viesti...'
                 }
@@ -468,11 +455,7 @@ export default function InboxThreadPage() {
               <button
                 type="button"
                 onClick={handleReply}
-                disabled={
-                  sendingReply ||
-                  !replyMessage.trim() ||
-                  response.workflow_status === 'cancelled'
-                }
+                disabled={sendingReply || !replyMessage.trim() || isCancelled}
                 className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
                 {sendingReply ? 'Lähetetään...' : 'Lähetä vastaus'}

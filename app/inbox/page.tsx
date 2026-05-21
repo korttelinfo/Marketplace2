@@ -22,6 +22,7 @@ type InboxResponse = {
   owner_id: string;
   message: string;
   status: string;
+  workflow_status?: string | null;
   read_at: string | null;
   created_at: string;
   messages?: InboxMessage[];
@@ -59,6 +60,25 @@ export default function InboxPage() {
     return Array.isArray(item.gigs) ? item.gigs[0] : item.gigs;
   }
 
+  function getStatusLabel(status?: string | null) {
+    switch (status) {
+      case 'agreement_requested':
+        return 'Sopimusta ehdotettu';
+      case 'agreement_rejected':
+        return 'Sopimus hylätty';
+      case 'active':
+        return 'Meneillään';
+      case 'completed':
+        return 'Suoritettu';
+      case 'cancelled':
+        return 'Lopetettu';
+      case 'archived':
+        return 'Arkistoitu';
+      default:
+        return 'Keskustelu';
+    }
+  }
+
   const loadInbox = async () => {
     setLoading(true);
     setError(null);
@@ -81,6 +101,7 @@ export default function InboxPage() {
         owner_id,
         message,
         status,
+        workflow_status,
         read_at,
         created_at,
         gigs (
@@ -103,7 +124,7 @@ export default function InboxPage() {
     const responseData = (responsesResult.data as InboxResponse[]) ?? [];
     const responseIds = responseData.map((item) => item.id);
 
-    let messagesByResponse: Record<string, InboxMessage[]> = {};
+    const messagesByResponse: Record<string, InboxMessage[]> = {};
 
     if (responseIds.length > 0) {
       const messagesResult = await supabase
@@ -112,9 +133,7 @@ export default function InboxPage() {
         .in('response_id', responseIds)
         .order('created_at', { ascending: true });
 
-      if (messagesResult.error) {
-        console.error('Message fetch error:', messagesResult.error);
-      } else {
+      if (!messagesResult.error) {
         for (const msg of (messagesResult.data as InboxMessage[]) ?? []) {
           if (!messagesByResponse[msg.response_id]) {
             messagesByResponse[msg.response_id] = [];
@@ -201,9 +220,6 @@ export default function InboxPage() {
           {conversations.length > 0 ? (
             conversations.map((item) => {
               const gig = getGigInfo(item);
-              const isOwnLatest = item.latestSenderId !== item.owner_id && item.latestSenderId !== item.sender_id
-                ? false
-                : false;
 
               return (
                 <Link
@@ -252,7 +268,7 @@ export default function InboxPage() {
                         </span>
                       ) : (
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                          {item.status === 'pending' ? 'Odottaa' : item.status}
+                          {getStatusLabel(item.workflow_status)}
                         </span>
                       )}
 
@@ -270,6 +286,7 @@ export default function InboxPage() {
               <p className="mt-2 text-sm leading-7 text-slate-600">
                 Keskustelut näkyvät täällä, kun otat yhteyttä ilmoituksiin tai joku vastaa sinun ilmoitukseesi.
               </p>
+
               <Link
                 href="/browse"
                 className="mt-6 inline-flex rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
