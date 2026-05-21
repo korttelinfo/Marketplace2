@@ -6,21 +6,31 @@ import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
-const navLinks = [
+type NavLink = {
+  label: string;
+  href: string;
+  requiresAuth?: boolean;
+};
+
+const navLinks: NavLink[] = [
   { label: 'Etusivu', href: '/' },
   { label: 'Selaa', href: '/browse' },
-  { label: 'Profiili', href: '/profile' },
+  { label: 'Posti', href: '/inbox', requiresAuth: true },
+  { label: 'Profiili', href: '/profile', requiresAuth: true },
 ];
 
 function navLinkClass(isActive: boolean) {
   return `rounded-full px-4 py-2 text-sm font-semibold transition ${
-    isActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+    isActive
+      ? 'bg-slate-900 text-white'
+      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
   }`;
 }
 
 export default function NavBar() {
   const pathname = usePathname() ?? '/';
   const router = useRouter();
+
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
@@ -31,11 +41,12 @@ export default function NavBar() {
       setSession(data.session);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      if (!mounted) return;
-      // `newSession` is the Session object or null
-      setSession(newSession ?? null);
-    });
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, newSession) => {
+        if (!mounted) return;
+        setSession(newSession ?? null);
+      }
+    );
 
     return () => {
       mounted = false;
@@ -51,45 +62,71 @@ export default function NavBar() {
 
   const isLoggedIn = Boolean(session?.user);
 
+  const visibleLinks = navLinks.filter(
+    (link) => !link.requiresAuth || isLoggedIn
+  );
+
   return (
-    <nav className="sticky top-0 z-40 hidden border-b border-slate-200/70 bg-white/95 backdrop-blur-md shadow-sm shadow-slate-100 md:block">
+    <nav className="sticky top-0 z-40 hidden border-b border-slate-200/70 bg-white/95 shadow-sm shadow-slate-100 backdrop-blur-md md:block">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-6 lg:px-8">
-        <Link href="/" className="text-lg font-semibold tracking-tight text-slate-900">
+        <Link
+          href="/"
+          className="text-xl font-semibold tracking-tight text-slate-900"
+        >
           Kortteli
         </Link>
 
         <div className="flex flex-wrap items-center gap-2">
-          {navLinks.map((link) => {
-            const isActive = link.href === '/' ? pathname === '/' : pathname.startsWith(link.href);
+          {visibleLinks.map((link) => {
+            const isActive =
+              link.href === '/'
+                ? pathname === '/'
+                : pathname.startsWith(link.href);
+
             return (
-              <Link key={link.href} href={link.href} className={navLinkClass(isActive)}>
+              <Link
+                key={link.href}
+                href={link.href}
+                className={navLinkClass(isActive)}
+              >
                 {link.label}
               </Link>
             );
           })}
 
           {isLoggedIn ? (
-            <button
-              onClick={handleSignOut}
-              className="rounded-full border border-slate-200 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-            >
-              Poistu
-            </button>
-          ) : (
-            <Link
-              href="/login"
-              className={navLinkClass(pathname === '/login')}
-            >
-              Kirjaudu
-            </Link>
-          )}
+            <>
+              <Link
+                href="/create"
+                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Luo ilmoitus
+              </Link>
 
-          <Link
-            href="/create"
-            className="rounded-full border border-slate-200 bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-          >
-            Luo keikka
-          </Link>
+              <button
+                onClick={handleSignOut}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              >
+                Poistu
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className={navLinkClass(pathname === '/login')}
+              >
+                Kirjaudu
+              </Link>
+
+              <Link
+                href="/login"
+                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Luo ilmoitus
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </nav>
