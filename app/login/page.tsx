@@ -1,17 +1,20 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageContainer from '../../components/PageContainer';
 import { supabase } from '../../lib/supabase';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const resetSuccess = searchParams?.get('reset_success') === '1';
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -85,6 +88,20 @@ export default function LoginPage() {
           {errorMessage ? (
             <div className="rounded-3xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {errorMessage}
+            </div>
+          ) : null}
+
+          {resetSuccess ? (
+            <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              Salasana vaihdettiin onnistuneesti. Voit nyt kirjautua sisään uudella salasanalla.
+            </div>
+          ) : null}
+
+          {mode === 'login' ? (
+            <div className="text-right text-sm text-slate-600">
+              <Link href="/reset-password" className="font-semibold text-slate-900 hover:text-slate-700">
+                Unohditko salasanan?
+              </Link>
             </div>
           ) : null}
 
