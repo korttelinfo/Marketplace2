@@ -28,8 +28,9 @@ export default function BrowsePage() {
       setError(null);
 
       const { data, error: fetchError } = await supabase
-        .from('gigs')
-        .select('id,title,category,budget,location,date_time,description,status,listing_type');
+  .from('gigs')
+  .select('id,title,category,budget,location,date_time,description,status,listing_type')
+  .eq('status', 'vapaa');
 
       if (fetchError) {
         console.error('Supabase fetch error:', fetchError);
