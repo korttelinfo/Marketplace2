@@ -1,16 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import PageContainer from '../../../components/PageContainer';
 import { supabase } from '../../../lib/supabase';
 import type { BrowseGig } from '../../../lib/mockGigs';
 import {
+  URGENCY_OPTIONS,
   getUrgencyEmoji,
   getUrgencyLabel,
   type Urgency,
 } from '../../../lib/helpCategories';
+
+type ResponseIntent = 'now' | 'today' | 'later' | 'ask';
+type CompensationReply = 'ok' | 'free' | 'suggest' | 'discuss';
 
 export default function BrowseGigPage() {
   const params = useParams();
@@ -21,11 +25,21 @@ export default function BrowseGigPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [contactOpen, setContactOpen] = useState(false);
+  const [responseOpen, setResponseOpen] = useState(false);
+  const [responseIntent, setResponseIntent] =
+    useState<ResponseIntent>('today');
+
+  const [compensationReply, setCompensationReply] =
+    useState<CompensationReply>('discuss');
+
+  const [suggestedAmount, setSuggestedAmount] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [contactError, setContactError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] =
+    useState<string | null>(null);
+
+  const [responseError, setResponseError] =
+    useState<string | null>(null);
 
   useEffect(() => {
     const fetchGig = async () => {
@@ -35,14 +49,18 @@ export default function BrowseGigPage() {
       const { data, error: fetchError } = await supabase
         .from('gigs')
         .select(
-          'id,title,category,budget,location,date_time,description,status,listing_type,user_id'
+          'id,title,category,budget,location,date_time,description,status,listing_type,user_id',
         )
         .eq('id', params.id)
         .maybeSingle();
 
       if (fetchError) {
-        console.error('Supabase gig fetch error:', fetchError);
-        setError('Ilmoitusta ei voitu ladata. Tarkista verkkoyhteys ja yritä uudelleen.');
+        console.error(fetchError);
+
+        setError(
+          'Tilannetta ei voitu ladata juuri nyt.',
+        );
+
         setGig(null);
       } else {
         setGig(data as BrowseGig);
@@ -57,16 +75,61 @@ export default function BrowseGigPage() {
     }
   }, [params.id]);
 
-  const handleSendMessage = async () => {
-    setContactError(null);
-    setSuccessMessage(null);
+  const listingType =
+    (gig as any)?.listing_type || 'Tarvitsen apua';
 
-    if (!message.trim()) {
-      setContactError('Kirjoita lyhyt viesti ennen lähettämistä.');
-      return;
+  const isOffer =
+    listingType === 'Tarjoan apua';
+
+  const isNeed = !isOffer;
+
+  const isUrgency =
+    gig &&
+    URGENCY_OPTIONS.includes(gig.date_time as Urgency);
+
+  const urgency =
+    isUrgency && gig
+      ? (gig.date_time as Urgency)
+      : null;
+
+  const pageCopy = useMemo(() => {
+    if (isOffer) {
+      return {
+        eyebrow: 'Tarjolla lähialueella',
+        actionLabel: 'Pyydä tätä',
+        actionTitle: 'Kiinnostuitko tästä?',
+        actionText:
+          'Lähetä kevyt yhteydenotto. Tarkemmat yksityiskohdat sovitaan vasta myöhemmin.',
+        modalTitle: 'Pyydä tätä',
+        modalIntro:
+          'Tämä ei vielä sido kumpaakaan osapuolta.',
+        placeholder:
+          'Hei! Tämä voisi sopia tarpeeseeni. Onnistuisiko esimerkiksi viikonloppuna?',
+        success: 'Pyyntö lähetetty.',
+      };
     }
 
-    const { data: sessionData } = await supabase.auth.getSession();
+    return {
+      eyebrow: 'Tarve lähialueella',
+      actionLabel: 'Voin auttaa',
+      actionTitle: 'Voisitko auttaa tässä?',
+      actionText:
+        'Kerro nopeasti milloin onnistuu ja miten haluaisit edetä.',
+      modalTitle: 'Voin auttaa',
+      modalIntro:
+        'Tee kevyt vastaus. Keskustelu tarkentuu vasta myöhemmin.',
+      placeholder:
+        'Hei! Tämä voisi onnistua minulta esimerkiksi tänään illalla.',
+      success: 'Vastaus lähetetty.',
+    };
+  }, [isOffer]);
+
+  const handleSendResponse = async () => {
+    setResponseError(null);
+    setSuccessMessage(null);
+
+    const { data: sessionData } =
+      await supabase.auth.getSession();
 
     if (!sessionData.session) {
       router.push('/login');
@@ -74,47 +137,72 @@ export default function BrowseGigPage() {
     }
 
     if (!gig || !ownerId) {
-      setContactError('Ilmoituksen tietoja ei voitu varmistaa.');
+      setResponseError(
+        'Tilannetta ei voitu varmistaa.',
+      );
       return;
     }
 
-    if (sessionData.session.user.id === ownerId) {
-      setContactError('Et voi lähettää yhteydenottoa omaan ilmoitukseesi.');
+    if (
+      sessionData.session.user.id === ownerId
+    ) {
+      setResponseError(
+        'Et voi vastata omaan julkaisuusi.',
+      );
       return;
     }
 
     setSending(true);
 
-    const { error: insertError } = await supabase.from('gig_responses').insert({
-      gig_id: gig.id,
-      sender_id: sessionData.session.user.id,
-      owner_id: ownerId,
-      message: message.trim(),
-      status: 'pending',
-    });
+    const structuredMessage =
+      buildStructuredMessage({
+        isOffer,
+        responseIntent,
+        compensationReply,
+        suggestedAmount,
+        message,
+      });
+
+    const { error: insertError } =
+      await supabase
+        .from('gig_responses')
+        .insert({
+          gig_id: gig.id,
+          sender_id:
+            sessionData.session.user.id,
+          owner_id: ownerId,
+          message: structuredMessage,
+          status: 'pending',
+        });
 
     if (insertError) {
-      console.error('Supabase response insert error:', insertError);
-      setContactError('Yhteydenoton lähetys epäonnistui. Yritä uudelleen.');
+      console.error(insertError);
+
+      setResponseError(
+        'Vastauksen lähetys epäonnistui.',
+      );
+
       setSending(false);
       return;
     }
 
-    setSuccessMessage('Yhteydenotto lähetetty.');
+    setSuccessMessage(pageCopy.success);
+
     setMessage('');
+    setSuggestedAmount('');
     setSending(false);
 
-    setTimeout(() => {
-      setContactOpen(false);
+    window.setTimeout(() => {
+      setResponseOpen(false);
       setSuccessMessage(null);
-    }, 1800);
+    }, 1500);
   };
 
   if (loading) {
     return (
       <PageContainer>
-        <div className="rounded-[2rem] bg-white/90 p-8 text-center text-slate-500 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200">
-          Ilmoitusta ladataan...
+        <div className="rounded-[2rem] border border-orange-100 bg-[#fffaf3] p-8 text-center text-slate-500">
+          Ladataan lähialueen tilannetta...
         </div>
       </PageContainer>
     );
@@ -123,155 +211,395 @@ export default function BrowseGigPage() {
   if (error || !gig) {
     return (
       <PageContainer>
-        <div className="rounded-[2rem] bg-white/90 p-8 text-center shadow-lg shadow-slate-200/60 ring-1 ring-slate-200">
-          <p className="text-lg font-semibold text-slate-900">Ilmoitusta ei voitu ladata</p>
+        <div className="rounded-[2rem] border border-orange-100 bg-[#fffaf3] p-8 text-center">
+          <p className="text-lg font-semibold text-slate-900">
+            Tätä ei voitu näyttää
+          </p>
+
           <p className="mt-2 text-sm text-slate-600">
-            {error ?? 'Ilmoitusta ei löytynyt.'}
+            {error ??
+              'Julkaisua ei löytynyt.'}
           </p>
         </div>
       </PageContainer>
     );
   }
 
-  const listingType = (gig as any).listing_type || 'Tarvitsen apua';
-  const isHelping = listingType === 'Tarjoan apua';
-
-  const urgencyOptions = ['Tänään', 'Tällä viikolla', 'Ei kiirettä'];
-  const isUrgency = urgencyOptions.includes(gig.date_time);
-  const urgency = isUrgency ? (gig.date_time as Urgency) : null;
-
-  const ctaText = isHelping ? 'Pyydä apua' : 'Tarjoudu auttamaan';
-
   return (
-    <PageContainer>
-      <div className="space-y-8">
+    <PageContainer contentClassName="max-w-5xl">
+      <div className="space-y-6">
+
         <Link
           href="/browse"
-          className="text-sm font-semibold text-slate-600 transition hover:text-slate-900"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-slate-900"
         >
-          ← Takaisin ilmoituksiin
+          ← Takaisin lähialueelle
         </Link>
 
-        <div className="grid gap-8 lg:grid-cols-[1.45fr_0.8fr]">
-          <section className="rounded-[2rem] bg-white/90 p-6 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200 sm:p-8">
-            <div className="flex flex-wrap items-center gap-3">
-              <span
-                className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                  isHelping
-                    ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-orange-100 text-orange-700'
-                }`}
-              >
-                {listingType}
-              </span>
+        <section className="overflow-hidden rounded-[2rem] border border-orange-100 bg-white shadow-sm">
 
-              <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
+          <div className="bg-[#fffaf3] px-5 py-7 sm:px-8 sm:py-9">
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-orange-700">
+                {pageCopy.eyebrow}
+              </p>
+
+              <span className="rounded-full border border-orange-100 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                {gig.status || 'Avoin'}
+              </span>
+            </div>
+
+            <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+              {gig.title}
+            </h1>
+
+            <div className="mt-6 flex flex-wrap gap-2">
+
+              <MetaPill>
+                {isNeed
+                  ? 'Tarvitsen'
+                  : 'Tarjoan'}
+              </MetaPill>
+
+              <MetaPill>
                 {gig.category}
-              </span>
+              </MetaPill>
 
-              {urgency && (
-                <span className="flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600">
-                  <span>{getUrgencyEmoji(urgency)}</span>
-                  {getUrgencyLabel(urgency)}
-                </span>
+              <MetaPill>
+                📍 {gig.location}
+              </MetaPill>
+
+              <MetaPill>
+                💶 {gig.budget || 'Sovitaan'}
+              </MetaPill>
+
+              {urgency ? (
+                <MetaPill>
+                  {getUrgencyEmoji(
+                    urgency,
+                  )}{' '}
+                  {getUrgencyLabel(
+                    urgency,
+                  )}
+                </MetaPill>
+              ) : (
+                <MetaPill>
+                  {gig.date_time}
+                </MetaPill>
               )}
             </div>
+          </div>
 
-            <div className="mt-6">
-              <h1 className="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
-                {gig.title}
-              </h1>
+          <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">
 
-              <p className="mt-6 text-base leading-8 text-slate-700">
-                {gig.description}
-              </p>
+            <div className="p-5 sm:p-8">
+
+              <section className="rounded-[1.75rem] border border-orange-100 bg-[#fffaf3] p-5">
+
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">
+                  Tilanne
+                </p>
+
+                <p className="mt-4 text-lg leading-8 text-slate-800">
+                  {gig.description?.trim()
+                    ? gig.description
+                    : 'Tarkemmat yksityiskohdat voidaan sopia myöhemmin yhdessä.'}
+                </p>
+              </section>
+
+              <section className="mt-5 rounded-[1.75rem] border border-slate-200 bg-white p-5">
+
+                <p className="text-sm font-semibold text-slate-900">
+                  Miten tämä yleensä etenee?
+                </p>
+
+                <div className="mt-5 space-y-4">
+
+                  <Step
+                    number="1"
+                    text={
+                      isNeed
+                        ? 'Lähetät nopean vastauksen ja kerrot milloin voisit auttaa.'
+                        : 'Lähetät kevyen pyynnön ja kerrot mitä tarvitset.'
+                    }
+                  />
+
+                  <Step
+                    number="2"
+                    text="Toinen osapuoli näkee vastauksesi ja voi jatkaa keskustelua."
+                  />
+
+                  <Step
+                    number="3"
+                    text="Tarkempi aika, paikka ja mahdollinen korvaus sovitaan yhdessä."
+                  />
+                </div>
+              </section>
             </div>
 
-            <div className="mt-8 grid gap-4 rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 sm:grid-cols-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Sijainti
+            <aside className="border-t border-orange-100 bg-[#fffaf3] p-5 sm:p-8 lg:border-l lg:border-t-0">
+
+              <div className="sticky top-6 rounded-[1.75rem] border border-orange-100 bg-white p-5">
+
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">
+                  Seuraava askel
                 </p>
-                <p className="mt-2 text-sm font-semibold text-slate-900">{gig.location}</p>
+
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                  {pageCopy.actionTitle}
+                </h2>
+
+                <p className="mt-3 text-sm leading-7 text-slate-600">
+                  {pageCopy.actionText}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setResponseOpen(true)
+                  }
+                  className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-slate-950 px-6 py-4 text-sm font-semibold text-white transition hover:bg-slate-800"
+                >
+                  {pageCopy.actionLabel}
+                </button>
+
+                <p className="mt-4 text-center text-xs leading-5 text-slate-500">
+                  Tarkemmat yhteystiedot kannattaa jakaa vasta, kun molemmat haluavat jatkaa.
+                </p>
               </div>
+            </aside>
+          </div>
+        </section>
+      </div>
+
+      {responseOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-3 sm:items-center sm:p-6">
+
+          <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-[2rem] border border-orange-100 bg-white p-5 shadow-2xl sm:p-6">
+
+            <div className="flex items-start justify-between gap-4">
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Korvaus
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">
+                  Kevyt yhteydenotto
                 </p>
-                <p className="mt-2 text-sm font-semibold text-slate-900">{gig.budget}</p>
+
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  {pageCopy.modalTitle}
+                </h2>
               </div>
-
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Tila
-                </p>
-                <span className="mt-2 inline-flex rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
-                  {gig.status}
-                </span>
-              </div>
-            </div>
-          </section>
-
-          <aside className="space-y-4">
-            <div className="rounded-[2rem] border border-slate-200 bg-white/90 p-6 shadow-sm">
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
-                Yhteydenotto
-              </p>
-
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
-                {ctaText}
-              </h2>
-
-              <p className="mt-3 text-sm leading-7 text-slate-600">
-                Lähetä lyhyt viesti ilmoituksen julkaisijalle ja sovi tarkemmat yksityiskohdat.
-              </p>
 
               <button
                 type="button"
-                onClick={() => setContactOpen(true)}
-                className={`mt-6 inline-flex w-full items-center justify-center rounded-full px-6 py-4 text-sm font-semibold text-white transition ${
-                  isHelping
-                    ? 'bg-emerald-700 hover:bg-emerald-600'
-                    : 'bg-slate-900 hover:bg-slate-700'
-                }`}
+                onClick={() =>
+                  setResponseOpen(false)
+                }
+                className="rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-200"
               >
-                {ctaText}
+                Sulje
               </button>
             </div>
-          </aside>
-        </div>
-      </div>
 
-      {contactOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center">
-          <div className="w-full max-w-lg rounded-[2rem] bg-white p-6 shadow-xl">
-            <h2 className="text-2xl font-semibold text-slate-900">{ctaText}</h2>
-
-            <p className="mt-3 text-sm leading-7 text-slate-600">
-              Kirjoita lyhyt ja ystävällinen viesti. Ilmoituksen julkaisija näkee sen profiilissaan.
+            <p className="mt-4 text-sm leading-7 text-slate-600">
+              {pageCopy.modalIntro}
             </p>
 
-            <textarea
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              rows={5}
-              placeholder="Hei! Voin auttaa tässä..."
-              className="mt-5 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-            />
+            <div className="mt-6 space-y-6">
 
-            {contactError ? (
-              <p className="mt-3 text-sm text-rose-600">{contactError}</p>
+              <div>
+
+                <p className="mb-3 text-sm font-semibold text-slate-900">
+                  Milloin tämä voisi onnistua?
+                </p>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+
+                  <ChoiceButton
+                    active={
+                      responseIntent ===
+                      'now'
+                    }
+                    onClick={() =>
+                      setResponseIntent(
+                        'now',
+                      )
+                    }
+                    title="Heti / pian"
+                    text="Sopii nopeisiin tilanteisiin."
+                  />
+
+                  <ChoiceButton
+                    active={
+                      responseIntent ===
+                      'today'
+                    }
+                    onClick={() =>
+                      setResponseIntent(
+                        'today',
+                      )
+                    }
+                    title="Tänään"
+                    text="Voidaan sopia saman päivän aikana."
+                  />
+
+                  <ChoiceButton
+                    active={
+                      responseIntent ===
+                      'later'
+                    }
+                    onClick={() =>
+                      setResponseIntent(
+                        'later',
+                      )
+                    }
+                    title="Myöhemmin"
+                    text="Vaatii hieman sopimista."
+                  />
+
+                  <ChoiceButton
+                    active={
+                      responseIntent ===
+                      'ask'
+                    }
+                    onClick={() =>
+                      setResponseIntent(
+                        'ask',
+                      )
+                    }
+                    title="Kysyn ensin"
+                    text="Tarvitsen lisätietoja."
+                  />
+                </div>
+              </div>
+
+              <div>
+
+                <p className="mb-3 text-sm font-semibold text-slate-900">
+                  Korvaus
+                </p>
+
+                <div className="grid gap-2">
+
+                  <ChoiceButton
+                    active={
+                      compensationReply ===
+                      'ok'
+                    }
+                    onClick={() =>
+                      setCompensationReply(
+                        'ok',
+                      )
+                    }
+                    title="Ilmoitettu korvaus sopii"
+                    text="Jatketaan nykyisellä ajatuksella."
+                  />
+
+                  <ChoiceButton
+                    active={
+                      compensationReply ===
+                      'free'
+                    }
+                    onClick={() =>
+                      setCompensationReply(
+                        'free',
+                      )
+                    }
+                    title="Voin auttaa ilman korvausta"
+                    text="Sopii kevyeen naapuriapuun."
+                  />
+
+                  <ChoiceButton
+                    active={
+                      compensationReply ===
+                      'discuss'
+                    }
+                    onClick={() =>
+                      setCompensationReply(
+                        'discuss',
+                      )
+                    }
+                    title="Sovitaan yhdessä"
+                    text="Korvaus tarkentuu myöhemmin."
+                  />
+
+                  <ChoiceButton
+                    active={
+                      compensationReply ===
+                      'suggest'
+                    }
+                    onClick={() =>
+                      setCompensationReply(
+                        'suggest',
+                      )
+                    }
+                    title="Ehdotan summaa"
+                    text="Anna oma ehdotuksesi."
+                  />
+                </div>
+
+                {compensationReply ===
+                'suggest' ? (
+                  <input
+                    type="number"
+                    min="0"
+                    value={suggestedAmount}
+                    onChange={(event) =>
+                      setSuggestedAmount(
+                        event.target.value,
+                      )
+                    }
+                    placeholder="Summa euroissa"
+                    className="mt-3 w-full rounded-full border border-orange-100 bg-[#fffaf3] px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                  />
+                ) : null}
+              </div>
+
+              <label className="block">
+
+                <span className="mb-2 block text-sm font-semibold text-slate-900">
+                  Lyhyt viesti
+                  <span className="ml-1 font-normal text-slate-400">
+                    (valinnainen)
+                  </span>
+                </span>
+
+                <textarea
+                  value={message}
+                  onChange={(event) =>
+                    setMessage(
+                      event.target.value,
+                    )
+                  }
+                  rows={4}
+                  placeholder={
+                    pageCopy.placeholder
+                  }
+                  className="w-full rounded-[1.5rem] border border-orange-100 bg-[#fffaf3] px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                />
+              </label>
+            </div>
+
+            {responseError ? (
+              <p className="mt-4 text-sm text-rose-600">
+                {responseError}
+              </p>
             ) : null}
 
             {successMessage ? (
-              <p className="mt-3 text-sm text-emerald-700">{successMessage}</p>
+              <p className="mt-4 text-sm text-emerald-700">
+                {successMessage}
+              </p>
             ) : null}
 
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+
               <button
                 type="button"
-                onClick={() => setContactOpen(false)}
+                onClick={() =>
+                  setResponseOpen(false)
+                }
                 className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
               >
                 Peruuta
@@ -279,11 +607,15 @@ export default function BrowseGigPage() {
 
               <button
                 type="button"
-                onClick={handleSendMessage}
+                onClick={
+                  handleSendResponse
+                }
                 disabled={sending}
-                className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
-                {sending ? 'Lähetetään...' : 'Lähetä yhteydenotto'}
+                {sending
+                  ? 'Lähetetään...'
+                  : pageCopy.actionLabel}
               </button>
             </div>
           </div>
@@ -291,4 +623,126 @@ export default function BrowseGigPage() {
       ) : null}
     </PageContainer>
   );
+}
+
+function MetaPill({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <span className="rounded-full border border-orange-100 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700">
+      {children}
+    </span>
+  );
+}
+
+function Step({
+  number,
+  text,
+}: {
+  number: string;
+  text: string;
+}) {
+  return (
+    <div className="flex gap-3">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white">
+        {number}
+      </span>
+
+      <p className="pt-1 text-sm leading-6 text-slate-600">
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function ChoiceButton({
+  active,
+  onClick,
+  title,
+  text,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  text: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-[1.35rem] border p-4 text-left transition ${
+        active
+          ? 'border-orange-300 bg-orange-50 text-slate-950'
+          : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-orange-200 hover:bg-[#fffaf3]'
+      }`}
+    >
+      <span className="block text-sm font-semibold">
+        {title}
+      </span>
+
+      <span
+        className={`mt-1 block text-xs leading-5 ${
+          active
+            ? 'text-slate-600'
+            : 'text-slate-500'
+        }`}
+      >
+        {text}
+      </span>
+    </button>
+  );
+}
+
+function buildStructuredMessage({
+  isOffer,
+  responseIntent,
+  compensationReply,
+  suggestedAmount,
+  message,
+}: {
+  isOffer: boolean;
+  responseIntent: ResponseIntent;
+  compensationReply: CompensationReply;
+  suggestedAmount: string;
+  message: string;
+}) {
+  const intentText: Record<
+    ResponseIntent,
+    string
+  > = {
+    now: 'Heti / pian',
+    today: 'Tänään',
+    later: 'Myöhemmin',
+    ask: 'Tarvitsen lisätietoja',
+  };
+
+  const compensationText: Record<
+    CompensationReply,
+    string
+  > = {
+    ok: 'Ilmoitettu korvaus sopii',
+    free: 'Voin auttaa ilman korvausta',
+    discuss:
+      'Sovitaan korvaus yhdessä',
+    suggest: suggestedAmount
+      ? `Ehdotan korvausta: ${suggestedAmount} €`
+      : 'Ehdotan korvausta',
+  };
+
+  const intro = isOffer
+    ? 'Pyyntö tähän tarjontaan'
+    : 'Vastaus tähän tarpeeseen';
+
+  return [
+    intro,
+    `Aikataulu: ${intentText[responseIntent]}`,
+    `Korvaus: ${compensationText[compensationReply]}`,
+    message.trim()
+      ? `Viesti: ${message.trim()}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
 }

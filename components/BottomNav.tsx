@@ -11,14 +11,15 @@ type NavItem = {
   href: string;
   icon: string;
   requiresAuth?: boolean;
+  primary?: boolean;
 };
 
 const navItems: NavItem[] = [
-  { label: 'Etusivu', href: '/', icon: '🏠' },
-  { label: 'Selaa', href: '/browse', icon: '🔍' },
-  { label: 'Luo', href: '/create', icon: '➕', requiresAuth: true },
-  { label: 'Posti', href: '/inbox', icon: '✉️', requiresAuth: true },
-  { label: 'Profiili', href: '/profile', icon: '👤', requiresAuth: true },
+  { label: 'Lähellä', href: '/browse', icon: '🏠' },
+  { label: 'Tarvitsen', href: '/create', icon: '➕', requiresAuth: true, primary: true },
+  { label: 'Omat jutut', href: '/activity', icon: '🧩', requiresAuth: true },
+  { label: '', href: '/notifications', icon: '🔔', requiresAuth: true },
+  { label: '', href: '/profile', icon: '👤', requiresAuth: true },
 ];
 
 export default function BottomNav() {
@@ -101,19 +102,43 @@ export default function BottomNav() {
   const visibleNavItems = navItems.filter((item) => !item.requiresAuth || isLoggedIn);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200/70 bg-white/95 shadow-lg shadow-slate-200 backdrop-blur-md md:hidden">
-      <div className="mx-auto flex h-16 max-w-full items-center justify-around px-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-orange-100 bg-white/90 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-md md:hidden">
+      <div className="mx-auto flex h-[76px] max-w-full items-center justify-around px-2 pb-2 pt-2">
         {visibleNavItems.map((item) => {
           const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
-          const showUnreadDot = item.href === '/inbox' && hasUnread;
+          const showUnreadDot = item.href === '/notifications' && hasUnread;
+
+          if (item.primary) {
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="relative -mt-6 flex min-w-[72px] flex-col items-center justify-center gap-1"
+              >
+                <span
+                  className={`flex h-14 w-14 items-center justify-center rounded-full text-xl shadow-lg transition ${
+                    isActive
+                      ? 'bg-orange-500 text-white shadow-orange-200'
+                      : 'bg-slate-950 text-white shadow-slate-300'
+                  }`}
+                >
+                  {item.icon}
+                </span>
+
+                <span className="text-[11px] font-semibold text-slate-700">
+                  {item.label}
+                </span>
+              </Link>
+            );
+          }
 
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-xs font-medium transition ${
+              className={`relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-xs font-semibold transition ${
                 isActive
-                  ? 'bg-slate-100 text-slate-900'
+                  ? 'bg-[#fffaf3] text-slate-950 ring-1 ring-orange-100'
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -125,7 +150,7 @@ export default function BottomNav() {
                 ) : null}
               </span>
 
-              <span className="line-clamp-1">{item.label}</span>
+              {item.label ? <span className="line-clamp-1">{item.label}</span> : null}
             </Link>
           );
         })}

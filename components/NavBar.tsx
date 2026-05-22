@@ -13,17 +13,16 @@ type NavLink = {
 };
 
 const navLinks: NavLink[] = [
-  { label: 'Etusivu', href: '/' },
-  { label: 'Selaa', href: '/browse' },
-  { label: 'Posti', href: '/inbox', requiresAuth: true },
+  { label: 'Lähellä', href: '/browse' },
+  { label: 'Omat jutut', href: '/activity', requiresAuth: true },
   { label: 'Profiili', href: '/profile', requiresAuth: true },
 ];
 
 function navLinkClass(isActive: boolean) {
   return `rounded-full px-4 py-2 text-sm font-semibold transition ${
     isActive
-      ? 'bg-slate-900 text-white'
-      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+      ? 'bg-slate-950 text-white'
+      : 'text-slate-700 hover:bg-orange-50 hover:text-slate-950'
   }`;
 }
 
@@ -107,40 +106,44 @@ export default function NavBar() {
 
   const isLoggedIn = Boolean(session?.user);
 
-  const visibleLinks = navLinks.filter(
-    (link) => !link.requiresAuth || isLoggedIn
-  );
+  const visibleLinks = navLinks.filter((link) => !link.requiresAuth || isLoggedIn);
+
+  if (
+    pathname.includes('/login') ||
+    pathname.includes('/reset-password') ||
+    pathname.includes('/onboarding')
+  ) {
+    return null;
+  }
 
   return (
-    <nav className="sticky top-0 z-40 hidden border-b border-slate-200/70 bg-white/95 shadow-sm shadow-slate-100 backdrop-blur-md md:block">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-6 lg:px-8">
-        <Link
-          href="/"
-          className="text-xl font-semibold tracking-tight text-slate-900"
-        >
-          Kortteli
+    <nav className="sticky top-0 z-40 hidden border-b border-orange-100 bg-white/90 shadow-sm shadow-orange-50 backdrop-blur-md md:block">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-6 lg:px-8">
+        <Link href="/browse" className="group flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#fffaf3] text-lg ring-1 ring-orange-100 transition group-hover:bg-orange-50">
+            🏘️
+          </div>
+
+          <div>
+            <p className="text-xl font-semibold tracking-tight text-slate-950">
+              Kortteli
+            </p>
+            <p className="-mt-0.5 text-xs font-medium text-slate-500">
+              Lähellä tapahtuu
+            </p>
+          </div>
         </Link>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           {visibleLinks.map((link) => {
             const isActive =
               link.href === '/'
                 ? pathname === '/'
                 : pathname.startsWith(link.href);
 
-            const showUnreadDot = link.href === '/inbox' && hasUnread;
-
             return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`${navLinkClass(isActive)} relative`}
-              >
+              <Link key={link.href} href={link.href} className={navLinkClass(isActive)}>
                 {link.label}
-
-                {showUnreadDot ? (
-                  <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-white" />
-                ) : null}
               </Link>
             );
           })}
@@ -149,32 +152,45 @@ export default function NavBar() {
             <>
               <Link
                 href="/create"
-                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
-                Luo ilmoitus
+                + Tarvitsen
+              </Link>
+
+              <Link
+                href="/notifications"
+                className={`relative flex h-10 w-10 items-center justify-center rounded-full text-lg transition ${
+                  pathname.startsWith('/notifications')
+                    ? 'bg-slate-950 text-white'
+                    : 'bg-[#fffaf3] text-slate-700 ring-1 ring-orange-100 hover:bg-orange-50'
+                }`}
+                aria-label="Ilmoitukset"
+              >
+                🔔
+                {hasUnread ? (
+                  <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-white" />
+                ) : null}
               </Link>
 
               <button
+                type="button"
                 onClick={handleSignOut}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                className="rounded-full border border-orange-100 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-orange-50"
               >
                 Poistu
               </button>
             </>
           ) : (
             <>
-              <Link
-                href="/login"
-                className={navLinkClass(pathname === '/login')}
-              >
+              <Link href="/login" className={navLinkClass(pathname === '/login')}>
                 Kirjaudu
               </Link>
 
               <Link
                 href="/login"
-                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
-                Luo ilmoitus
+                Aloita
               </Link>
             </>
           )}
