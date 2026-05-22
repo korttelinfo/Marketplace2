@@ -3,27 +3,60 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import {
+  Bell,
+  CirclePlus,
+  CircleUserRound,
+  House,
+  MessagesSquare,
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
 type NavItem = {
   label: string;
   href: string;
-  icon: string;
+  icon: React.ReactNode;
   requiresAuth?: boolean;
-  primary?: boolean;
+  center?: boolean;
 };
 
 const navItems: NavItem[] = [
-  { label: 'Lähellä', href: '/browse', icon: '🏠' },
-  { label: 'Tarvitsen', href: '/create', icon: '➕', requiresAuth: true, primary: true },
-  { label: 'Omat jutut', href: '/activity', icon: '🧩', requiresAuth: true },
-  { label: '', href: '/notifications', icon: '🔔', requiresAuth: true },
-  { label: '', href: '/profile', icon: '👤', requiresAuth: true },
+  {
+    label: 'Lähellä',
+    href: '/browse',
+    icon: <House size={22} strokeWidth={2} />,
+  },
+  {
+    label: 'Omat jutut',
+    href: '/activity',
+    icon: <MessagesSquare size={22} strokeWidth={2} />,
+    requiresAuth: true,
+  },
+  {
+    label: 'Uusi',
+    href: '/create',
+    icon: <CirclePlus size={24} strokeWidth={2.1} />,
+    requiresAuth: true,
+    center: true,
+  },
+  {
+    label: 'Tapahtumat',
+    href: '/notifications',
+    icon: <Bell size={22} strokeWidth={2} />,
+    requiresAuth: true,
+  },
+  {
+    label: 'Profiili',
+    href: '/profile',
+    icon: <CircleUserRound size={22} strokeWidth={2} />,
+    requiresAuth: true,
+  },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname() ?? '/';
+
   const [session, setSession] = useState<Session | null>(null);
   const [hasUnread, setHasUnread] = useState(false);
 
@@ -53,7 +86,8 @@ export default function BottomNav() {
 
       const messagesResult = await supabase
         .from('gig_response_messages')
-        .select(`
+        .select(
+          `
           id,
           sender_id,
           read_at,
@@ -61,7 +95,8 @@ export default function BottomNav() {
             sender_id,
             owner_id
           )
-        `)
+        `,
+        )
         .neq('sender_id', userId)
         .is('read_at', null)
         .or(`sender_id.eq.${userId},owner_id.eq.${userId}`, {
@@ -77,19 +112,19 @@ export default function BottomNav() {
 
     loadSessionAndUnread();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      if (!mounted) return;
-      setSession(newSession ?? null);
-      loadSessionAndUnread();
-    });
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, newSession) => {
+        if (!mounted) return;
+        setSession(newSession ?? null);
+        loadSessionAndUnread();
+      },
+    );
 
     return () => {
       mounted = false;
       listener.subscription.unsubscribe();
     };
   }, [pathname]);
-
-  const isLoggedIn = Boolean(session?.user);
 
   if (
     pathname.includes('/login') ||
@@ -99,61 +134,62 @@ export default function BottomNav() {
     return null;
   }
 
-  const visibleNavItems = navItems.filter((item) => !item.requiresAuth || isLoggedIn);
+  const isLoggedIn = Boolean(session?.user);
+
+  // Replace with real unread events state later.
+  const hasUnreadEvents = hasUnread;
+
+  const visibleNavItems = navItems.filter(
+    (item) => !item.requiresAuth || isLoggedIn,
+  );
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-orange-100 bg-white/90 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur-md md:hidden">
-      <div className="mx-auto flex h-[76px] max-w-full items-center justify-around px-2 pb-2 pt-2">
-        {visibleNavItems.map((item) => {
-          const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
-          const showUnreadDot = item.href === '/notifications' && hasUnread;
+    <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden">
+      <div className="mx-auto max-w-md px-3 pb-3">
+        <div className="grid h-[86px] grid-cols-5 items-center rounded-[2rem] bg-white/95 px-2 shadow-[0_-6px_20px_rgba(74,59,47,0.08)] ring-1 ring-stone-200/70 backdrop-blur-md">
+          {visibleNavItems.map((item) => {
+            const isActive =
+              item.href === '/'
+                ? pathname === '/'
+                : pathname.startsWith(item.href);
 
-          if (item.primary) {
+            const showUnreadDot =
+              item.href === '/notifications' && hasUnreadEvents;
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className="relative -mt-6 flex min-w-[72px] flex-col items-center justify-center gap-1"
+                aria-label={item.label}
+                className="flex min-w-0 justify-center"
               >
                 <span
-                  className={`flex h-14 w-14 items-center justify-center rounded-full text-xl shadow-lg transition ${
+                  className={`relative inline-flex min-h-[58px] min-w-[58px] items-center justify-center rounded-[1.45rem] px-3 transition ${
                     isActive
-                      ? 'bg-orange-500 text-white shadow-orange-200'
-                      : 'bg-slate-950 text-white shadow-slate-300'
+                      ? 'bg-[#e6d7c3] text-stone-950 shadow-sm ring-1 ring-stone-200/70'
+                      : item.center
+                        ? 'bg-[#f6efe4] text-stone-800 ring-1 ring-stone-200/70 hover:bg-[#eadfce]'
+                        : 'text-stone-500 hover:bg-[#fbf8f2] hover:text-stone-800'
                   }`}
                 >
-                  {item.icon}
-                </span>
+                  <span className="relative flex items-center justify-center">
+                    {item.icon}
 
-                <span className="text-[11px] font-semibold text-slate-700">
-                  {item.label}
+                    {showUnreadDot ? (
+                      <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-emerald-600 ring-2 ring-white" />
+                    ) : null}
+                  </span>
+
+                  {isActive ? (
+                    <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tracking-tight text-stone-950">
+                      {item.label}
+                    </span>
+                  ) : null}
                 </span>
               </Link>
             );
-          }
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-xs font-semibold transition ${
-                isActive
-                  ? 'bg-[#fffaf3] text-slate-950 ring-1 ring-orange-100'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <span className="relative text-lg">
-                {item.icon}
-
-                {showUnreadDot ? (
-                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-white" />
-                ) : null}
-              </span>
-
-              {item.label ? <span className="line-clamp-1">{item.label}</span> : null}
-            </Link>
-          );
-        })}
+          })}
+        </div>
       </div>
     </nav>
   );

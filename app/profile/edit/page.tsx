@@ -429,7 +429,7 @@ export default function EditProfilePage() {
 
             </div>
 
-            <div className="rounded-[2rem] bg-white/75 p-5 shadow-sm ring-1 ring-stone-200/80 backdrop-blur">
+            <div className="rounded-[2rem] bg-[#fffdf9]/85 p-5 shadow-sm ring-1 ring-stone-200/80 backdrop-blur">
 
               <div className="flex items-center justify-between gap-3">
 

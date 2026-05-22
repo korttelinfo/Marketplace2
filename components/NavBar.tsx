@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { Bell } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
@@ -117,10 +118,10 @@ export default function NavBar() {
   }
 
   return (
-    <nav className="sticky top-0 z-40 hidden border-b border-orange-100 bg-white/90 shadow-sm shadow-orange-50 backdrop-blur-md md:block">
+    <nav className="sticky top-0 z-40 hidden border-b border-stone-200/50 bg-white/90 shadow-sm shadow-stone-100/50 backdrop-blur-md md:block">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-6 lg:px-8">
         <Link href="/browse" className="group flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#fffaf3] text-lg ring-1 ring-orange-100 transition group-hover:bg-orange-50">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#fffaf3] text-lg ring-1 ring-stone-200/50 transition group-hover:bg-[#f6efe4]">
             🏘️
           </div>
 
@@ -159,23 +160,24 @@ export default function NavBar() {
 
               <Link
                 href="/notifications"
-                className={`relative flex h-10 w-10 items-center justify-center rounded-full text-lg transition ${
+                className={`relative flex h-10 w-10 items-center justify-center rounded-full transition ${
                   pathname.startsWith('/notifications')
                     ? 'bg-slate-950 text-white'
-                    : 'bg-[#fffaf3] text-slate-700 ring-1 ring-orange-100 hover:bg-orange-50'
+                    : 'bg-[#fffaf3] text-slate-600 ring-1 ring-stone-200/50 hover:bg-[#f6efe4]'
                 }`}
-                aria-label="Ilmoitukset"
+                aria-label="Tapahtumat"
               >
-                🔔
+                <Bell size={20} className="transition" />
+                {/* Replace with real unread events state later */}
                 {hasUnread ? (
-                  <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-orange-500 ring-2 ring-white" />
+                  <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-emerald-600 ring-2 ring-white" />
                 ) : null}
               </Link>
 
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="rounded-full border border-orange-100 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-orange-50"
+                className="rounded-full border border-stone-200/50 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-[#f6efe4]"
               >
                 Poistu
               </button>

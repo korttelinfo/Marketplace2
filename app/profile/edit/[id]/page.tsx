@@ -132,7 +132,9 @@ export default function EditGigPage({ params }: Props) {
 
   return (
     <PageContainer contentClassName="max-w-5xl">
-      <div className="space-y-6 pb-10 text-stone-900">
+      <div className="relative space-y-6 pb-10 text-stone-900">
+        <div className="pointer-events-none absolute -right-16 top-10 h-56 w-56 rounded-full bg-amber-200/20 blur-3xl" />
+        <div className="pointer-events-none absolute -left-16 bottom-12 h-72 w-72 rounded-full bg-emerald-200/15 blur-3xl" />
         <div className="flex items-center justify-between gap-4">
           <Link
             href="/profile"
@@ -325,7 +327,7 @@ export default function EditGigPage({ params }: Props) {
             <div className="rounded-[2rem] bg-[#fbf8f2] p-5 shadow-sm ring-1 ring-stone-200/70">
               <p className="mb-4 text-sm font-semibold text-stone-950">Esikatselu</p>
 
-              <div className="rounded-[1.75rem] bg-white p-5 shadow-sm ring-1 ring-stone-200/70">
+              <div className="rounded-[1.75rem] bg-[#fffdf9] p-5 shadow-sm ring-1 ring-stone-200/70">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <span className="rounded-full bg-[#fbf8f2] px-3 py-1 text-xs font-semibold text-stone-700 ring-1 ring-stone-200/70">
                     {category || 'Kategoria'}
@@ -363,7 +365,7 @@ export default function EditGigPage({ params }: Props) {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-[1.5rem] bg-white/65 p-4 text-sm leading-6 text-stone-600 ring-1 ring-stone-200/70">
+              <div className="mt-4 rounded-[1.5rem] bg-[#fffdf9]/80 p-4 text-sm leading-6 text-stone-600 ring-1 ring-stone-200/70">
                 Ilmoitus voi olla keskeneräinenkin. Tärkeintä on, että toinen saa turvallisen ja selkeän ensikuvan.
               </div>
             </div>
@@ -386,7 +388,7 @@ function EditSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-stone-200/70 sm:p-7">
+    <section className="rounded-[2rem] bg-[#fffdf9] p-6 shadow-sm ring-1 ring-stone-200/70 sm:p-7">
       <div className="mb-6 flex gap-4">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fbf8f2] text-sm font-semibold text-stone-800 ring-1 ring-stone-200/70">
           {eyebrow}

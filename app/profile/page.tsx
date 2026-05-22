@@ -171,6 +171,8 @@ export default function ProfilePage() {
       <div className="mx-auto max-w-6xl space-y-8 pb-10">
 
         <section className="relative overflow-hidden rounded-[2.5rem] bg-[#fbf8f2] p-6 shadow-sm ring-1 ring-stone-200/70 sm:p-8 lg:p-10">
+          <div className="pointer-events-none absolute -right-16 top-8 h-60 w-60 rounded-full bg-amber-200/25 blur-3xl" />
+          <div className="pointer-events-none absolute -left-16 bottom-8 h-72 w-72 rounded-full bg-emerald-200/20 blur-3xl" />
 
           <div className="mb-6 flex flex-wrap justify-end gap-2">
 
@@ -234,12 +236,12 @@ export default function ProfilePage() {
 
               <div className="flex flex-wrap gap-2.5">
 
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-medium text-stone-800 shadow-sm ring-1 ring-stone-200/80">
-                  <Check size={15} className="text-emerald-700" />
-                  Luotettava
-                </span>
+<span className="inline-flex items-center gap-2 rounded-full bg-[#fffdf9] px-4 py-2 text-sm font-medium text-stone-800 shadow-sm ring-1 ring-stone-200/80">
+                    <Check size={15} className="text-emerald-700" />
+                    Luotettava
+                  </span>
 
-                <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-medium text-stone-800 shadow-sm ring-1 ring-stone-200/80">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-[#fffdf9] px-4 py-2 text-sm font-medium text-stone-800 shadow-sm ring-1 ring-stone-200/80">
                   <Check size={15} className="text-emerald-700" />
                   Helppo sopia
                 </span>
@@ -254,7 +256,7 @@ export default function ProfilePage() {
 
         <section className="grid gap-5 lg:grid-cols-2">
 
-          <article className="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-stone-200/70">
+          <article className="rounded-[2rem] bg-[#fffdf9] p-6 shadow-sm ring-1 ring-stone-200/70">
 
             <div className="flex items-center gap-2 text-stone-950">
               <Sparkles size={19} />
@@ -319,7 +321,7 @@ export default function ProfilePage() {
 
           </article>
 
-          <article className="rounded-[2rem] bg-white p-6 shadow-sm ring-1 ring-stone-200/70">
+          <article className="rounded-[2rem] bg-[#fffdf9] p-6 shadow-sm ring-1 ring-stone-200/70">
 
             <div className="flex items-center gap-2 text-stone-950">
               <ShieldCheck size={20} />
